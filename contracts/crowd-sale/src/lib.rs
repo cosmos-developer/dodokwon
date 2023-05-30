@@ -10,7 +10,7 @@ pub mod state;
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
-    deps: DepsMut,
+    deps: DepsMut<TerraQuery>,
     env: Env,
     info: MessageInfo,
     msg: InstantiateMsg,
@@ -19,7 +19,7 @@ pub fn instantiate(
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
-pub fn query(deps: Deps, env: Env, msg: msg::QueryMsg) -> StdResult<Binary> {
+pub fn query(deps: Deps<TerraQuery>, env: Env, msg: msg::QueryMsg) -> StdResult<Binary> {
     contract::query(deps, env, msg)
 }
 
