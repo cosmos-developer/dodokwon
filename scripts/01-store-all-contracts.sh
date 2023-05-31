@@ -38,7 +38,6 @@ done
 
 NODE="--node $RPC"
 TXFLAG="$NODE --chain-id $CHAIN_ID --gas-prices 2500000uluna --gas auto --gas-adjustment 1.3"
-WALLET_ADDRESS=$(terrad keys list --output json | jq -c "[ .[] | select( .name == \"$WALLET\") ][0].address")
 
 MAX_ATTEMPTS=2
 SLEEP_TIME=5
@@ -62,8 +61,8 @@ if [ -n "$CW20_BASE_PATH" ]; then
         STORE_DATA="{\"tx\":\"$TX\",\"code_id\":$CODE_ID,\"code_checksum\":\"$CODE_CHECKSUM\"}"
        
         if [ -n "$CODE_ID" ]; then
-            echo $STORE_DATA > store/cw20_base_store_data.json
-            echo "Store info cw20 base contract: ./store/cw20_base_store_data.json"
+            echo $STORE_DATA > store/cw20-base-store-data.json
+            echo "Store info cw20 base contract: ./store/cw20-base-store-data.json"
             success=true
         else
             attempts=$((attempts + 1))
@@ -92,8 +91,8 @@ if [ -n "$CROWD_SALE_PATH" ]; then
         STORE_DATA="{\"tx\":\"$TX\",\"code_id\":$CODE_ID,\"code_checksum\":\"$CODE_CHECKSUM\"}"
        
         if [ -n "$CODE_ID" ]; then
-            echo $STORE_DATA > store/crowd_sale_store_data.json
-            echo "Store info cw20 base contract: ./store/crowd_sale_store_data.json"
+            echo $STORE_DATA > store/crowd-sale-store-data.json
+            echo "Store info cw20 base contract: ./store/crowd-sale-store-data.json"
             success=true
         else
             attempts=$((attempts + 1))
@@ -123,8 +122,8 @@ if [ -n "$FOUNDATION_PATH" ]; then
         STORE_DATA="{\"tx\":\"$TX\",\"code_id\":$CODE_ID,\"code_checksum\":\"$CODE_CHECKSUM\"}"
        
         if [ -n "$CODE_ID" ]; then
-            echo $STORE_DATA > store/foundation_store_data.json
-            echo "Store info cw20 base contract: ./store/foundation_store_data.json"
+            echo $STORE_DATA > store/foundation-store-data.json
+            echo "Store info cw20 base contract: ./store/foundation-store-data.json"
             success=true
         else
             attempts=$((attempts + 1))
