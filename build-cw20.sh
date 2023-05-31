@@ -33,6 +33,9 @@ while [[ $# -gt 0 ]]; do
         --contract-address)
             CONTRACT_ADDR=$2
             ;;
+        --crowd_sale_address)
+            CROWD_SALE_ADDRESS=$2
+            ;;
         *)
             ;;
     esac
@@ -76,9 +79,9 @@ if [ "$ACTION" = "all" ] || [ "$ACTION" = "instantiate" ]; then
         echo "Expected --code-id"
         exit 1
     fi
-    
+
     echo -e "\n\nInstantiating contract..."
-    INITIAL_STATE="{\"name\" : \"MyCoin\", \"symbol\": \"MCO\", \"decimals\": 8, \"max_supply\": \"1000000\", \"foundation\": $WALLET_ADDRESS}"
+    INITIAL_STATE="{\"name\" : \"MyCoin\", \"symbol\": \"MCO\", \"decimals\": 6, \"initial_balances\": [{\"address\": $WALLET_ADDRESS, \"amount\": \"3000\"}], \"mint\": {\"minter\": $WALLET_ADDRESS, \"cap\": \"100000}}"
     INSTANTIATE_TX=$(terrad tx wasm instantiate $CODE_ID "$INITIAL_STATE" --from $WALLET $TXFLAG -y --no-admin)
 
     attempts=0
@@ -100,21 +103,37 @@ if [ "$ACTION" = "all" ] || [ "$ACTION" = "instantiate" ]; then
     fi
 fi
 
-# 3. Query
+# 3. Update 
+if [ "$ACTION" = "execute" ]; then
+    if [ -z "$CONTRACT_ADDR" ]; then
+        echo "Expected --contract-address"
+        exit 1
+    fi
+
+    UPDATE_MINTER_ARGS="{\"update_minter\":{\"new_minter\": \"$CROWD_SALE_ADDRESS\"}}" 
+    echo "Update Minter:"
+    terrad tx wasm execute $CONTRACT_ADDR $UPDATE_MINTER_ARGS --from $WALLET $TXFLAG -y --output json
+fi
+
+# 4. Query
 if [ "$ACTION" = "all" ] || [ "$ACTION" = "query" ]; then
     if [ -z "$CONTRACT_ADDR" ]; then
         echo "Expected --contract-address"
         exit 1
     fi
 
-    QUERY_ONE_ARGS="{\"oracle_one\":{}}" 
-    terrad query wasm contract-state smart $CONTRACT_ADDR $QUERY_ONE_ARGS $NODE 
+    if [ -z "$CROWD_SALE_ADDRESS" ]; then
+        echo "Expected --crowd-sale-address"
+        exit 1
+    fi
 
-    QUERY_TWO_ARGS="{\"oracle_two\":{}}" 
-    terrad query wasm contract-state smart $CONTRACT_ADDR $QUERY_TWO_ARGS $NODE
+    QUERY_TOKEN_INFO_ARGS="{\"token_info\":{}}" 
+    echo "Token info:"
+    terrad query wasm contract-state smart $CONTRACT_ADDR $QUERY_TOKEN_INFO_ARGS $NODE
 
-    QUERY_THREE_ARGS="{\"oracle_three\":{}}" 
-    terrad query wasm contract-state smart $CONTRACT_ADDR $QUERY_THREE_ARGS $NODE
+    QUERY_BALANCE_ARGS="{\"balance\":{\"address\":\"$WALLET_ADDRESS\"}}" 
+    echo "Foundation balance:"
+    terrad query wasm contract-state smart $CONTRACT_ADDR $QUERY_BALANCE_ARGS $NODE
 fi
 
 # # 3. Execute transfer
