@@ -4,7 +4,7 @@ use cosmwasm_std::{Addr, Decimal, Uint128};
 #[cw_serde]
 pub struct InstantiateMsg {
     pub cw20_address: Addr,
-    pub owner: Addr,
+    // pub owner: Addr,
     pub mintable_period_days: u64,
     pub udodokwan_per_uusd: Decimal,
 }
@@ -17,15 +17,10 @@ pub enum ExecuteMsg {
 #[cw_serde]
 #[derive(QueryResponses)]
 pub enum QueryMsg {
-    // #[returns(OracleResp)]
-    // OracleOne {},
-    #[returns(OwnerResp)]
-    Owner {},
     #[returns(Cw20AddressResp)]
     Cw20Address {},
     #[returns(MintableBlockHeightResp)]
     MintableBlockHeight {},
-    // create udodokwan uusd pair
     #[returns(UdodokwanPerUusdResp)]
     UdodokwanPerUusd {},
     #[returns(UdodokwanToUlunaResp)]
@@ -35,11 +30,6 @@ pub enum QueryMsg {
 #[cw_serde]
 pub struct OracleResp {
     pub exchange_rate: String,
-}
-
-#[cw_serde]
-pub struct OwnerResp {
-    pub owner: Addr,
 }
 
 #[cw_serde]

@@ -1,7 +1,7 @@
 use crate::{
     error::ContractError,
     msg::*,
-    state::{CW20_ADDRESS, MINTABLE_BLOCK_HEIGHT, OWNER, UDODOKWAN_UUSD},
+    state::{CW20_ADDRESS, MINTABLE_BLOCK_HEIGHT, UDODOKWAN_UUSD},
 };
 
 use cosmwasm_std::{
@@ -26,7 +26,6 @@ pub fn instantiate(
     MINTABLE_BLOCK_HEIGHT.save(deps.storage, &mintable_block_height)?;
 
     CW20_ADDRESS.save(deps.storage, &msg.cw20_address)?;
-    OWNER.save(deps.storage, &msg.owner)?;
     UDODOKWAN_UUSD.save(deps.storage, &msg.udodokwan_per_uusd)?;
 
     Ok(Response::default())
@@ -98,7 +97,6 @@ mod execute {
 
 pub fn query(deps: Deps<TerraQuery>, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
-        QueryMsg::Owner {} => to_binary(&query::owner(deps)?),
         QueryMsg::Cw20Address {} => to_binary(&query::cw20_address(deps)?),
         QueryMsg::MintableBlockHeight {} => to_binary(&query::mintable_block_height(deps)?),
         QueryMsg::UdodokwanPerUusd {} => to_binary(&query::udodokwan_per_uusd(deps)?),
@@ -110,11 +108,6 @@ pub fn query(deps: Deps<TerraQuery>, _env: Env, msg: QueryMsg) -> StdResult<Bina
 
 mod query {
     use super::*;
-
-    pub fn owner(deps: Deps<TerraQuery>) -> StdResult<OwnerResp> {
-        let owner = OWNER.load(deps.storage)?;
-        Ok(OwnerResp { owner })
-    }
 
     pub fn cw20_address(deps: Deps<TerraQuery>) -> StdResult<Cw20AddressResp> {
         let cw20_address = CW20_ADDRESS.load(deps.storage)?;
@@ -218,7 +211,6 @@ mod test {
             let cw20_address = Addr::unchecked("cw20_address");
             let msg = InstantiateMsg {
                 cw20_address: cw20_address.clone(),
-                owner: owner.clone(),
                 mintable_period_days: 30,
                 udodokwan_per_uusd,
             };
@@ -229,10 +221,6 @@ mod test {
             let bin_res = query(deps.as_ref(), env.clone(), QueryMsg::Cw20Address {}).unwrap();
             let res: Cw20AddressResp = from_binary(&bin_res).unwrap();
             assert_eq!(res.cw20_address, cw20_address);
-
-            let bin_res = query(deps.as_ref(), env.clone(), QueryMsg::Owner {}).unwrap();
-            let res: OwnerResp = from_binary(&bin_res).unwrap();
-            assert_eq!(res.owner, owner);
 
             let bin_res =
                 query(deps.as_ref(), mock_env(), QueryMsg::MintableBlockHeight {}).unwrap();
@@ -258,7 +246,6 @@ mod test {
             let cw20_address = Addr::unchecked("cw20_address");
             let msg = InstantiateMsg {
                 cw20_address: cw20_address.clone(),
-                owner: owner.clone(),
                 mintable_period_days: 30,
                 udodokwan_per_uusd,
             };
@@ -301,7 +288,6 @@ mod test {
             let cw20_address = Addr::unchecked("cw20_address");
             let msg = InstantiateMsg {
                 cw20_address: cw20_address.clone(),
-                owner: owner.clone(),
                 mintable_period_days: 30,
                 udodokwan_per_uusd,
             };
@@ -321,97 +307,4 @@ mod test {
             );
         }
     }
-
-    // mod integration_test {
-    //     use super::*;
-
-    //     use anyhow::Result as AnyResult;
-    //     use cosmwasm_std::{ContractResult, Storage};
-    //     use cw20::{Cw20Coin, MinterResponse};
-    //     use cw20_base::contract::{
-    //         execute as cw20_execute, instantiate as cw20_instantiate, query as cw20_query,
-    //     };
-    //     use cw20_base::msg::InstantiateMsg as Cw20InstantiateMsg;
-    //     use cw_multi_test::custom_handler::CachingCustomHandler;
-    //     use cw_multi_test::{
-    //         App, AppBuilder, AppResponse, BasicAppBuilder, ContractWrapper, Executor,
-    //     };
-    //     // struct CustomHandler {}
-    //     // impl CustomHandler {
-    //     //     // this is a custom initialization method
-    //     //     pub fn exchange_rates(
-    //     //         base_denom: String,
-    //     //         quote_denoms: Vec<String>,
-    //     //     ) -> SystemResult<ContractResult<Binary>> {
-    //     //         assert_eq!(base_denom, "uluna");
-    //     //         assert_eq!(quote_denoms[0], "uusd".to_string());
-    //     //         let response = ExchangeRatesResponse {
-    //     //             base_denom: base_denom.to_string(),
-    //     //             exchange_rates: vec![ExchangeRateItem {
-    //     //                 quote_denom: quote_denoms[0].to_string(),
-    //     //                 exchange_rate: Decimal::from_ratio(
-    //     //                     Uint128::from(1u128),
-    //     //                     Uint128::from(11_500u128),
-    //     //                 ),
-    //     //             }],
-    //     //         };
-    //     //         let bin_response = to_binary(&response);
-
-    //     //         SystemResult::Ok((bin_response).into())
-    //     //     }
-    //     // }
-
-    //     #[test]
-    //     fn integrate_instantiate() {
-    //         // let mut app = BasicAppBuilder::<_, TerraQuery>::new_custom()
-    //         //     .with_custom(CachingCustomHandler::<_, TerraQuery>::new())
-    //         //     .build(|router, _, storage| {
-    //         //         router.custom.state.queries().unwrap();
-    //         //     });
-    //         let mut app = App::new();
-
-    //         let owner = Addr::unchecked("owner");
-
-    //         let cw20_code = ContractWrapper::new(cw20_execute, cw20_instantiate, cw20_query);
-    //         let cw20_code_id = app.store_code(Box::new(cw20_code));
-    //         let cw20_msg = Cw20InstantiateMsg {
-    //             name: "test".to_string(),
-    //             symbol: "TEST".to_string(),
-    //             decimals: 6,
-    //             initial_balances: vec![Cw20Coin {
-    //                 address: owner.to_string(),
-    //                 amount: Uint128::new(3_000),
-    //             }],
-    //             mint: Some(MinterResponse {
-    //                 minter: owner.to_string(),
-    //                 cap: Some(Uint128::new(100_000_000)),
-    //             }),
-    //             marketing: None,
-    //         };
-    //         let cw20_addr = app
-    //             .instantiate_contract(cw20_code_id, owner, &cw20_msg, &[], "Cw20 Base", None)
-    //             .unwrap();
-
-    //         let crowd_sale_code = ContractWrapper::new(execute, instantiate, query);
-    //         // store code with terry query
-    //         let crowd_sale_code_id = app.store_code(Box::new(crowd_sale_code));
-    //         let cw20_msg = Cw20InstantiateMsg {
-    //             name: "test".to_string(),
-    //             symbol: "TEST".to_string(),
-    //             decimals: 6,
-    //             initial_balances: vec![Cw20Coin {
-    //                 address: owner.to_string(),
-    //                 amount: Uint128::new(3_000),
-    //             }],
-    //             mint: Some(MinterResponse {
-    //                 minter: owner.to_string(),
-    //                 cap: Some(Uint128::new(100_000_000)),
-    //             }),
-    //             marketing: None,
-    //         };
-    //         let cw20_addr = app
-    //             .instantiate_contract(cw20_code_id, owner, &cw20_msg, &[], "Cw20 Base", None)
-    //             .unwrap();
-    //     }
-    // }
 }

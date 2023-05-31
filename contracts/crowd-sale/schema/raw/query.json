@@ -5,19 +5,6 @@
     {
       "type": "object",
       "required": [
-        "owner"
-      ],
-      "properties": {
-        "owner": {
-          "type": "object",
-          "additionalProperties": false
-        }
-      },
-      "additionalProperties": false
-    },
-    {
-      "type": "object",
-      "required": [
         "cw20_address"
       ],
       "properties": {
