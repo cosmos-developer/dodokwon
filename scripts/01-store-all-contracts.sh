@@ -108,8 +108,7 @@ fi
 
 if [ -n "$FOUNDATION_PATH" ]; then
     echo -e "\nStoring code foundation..."
-    # TX=$(terrad tx wasm store $FOUNDATION_PATH --from $WALLET $TXFLAG --output json -y | jq -r '.txhash')
-    TX="3B1E16232CFA5ECDB4096D81C2221857D329E61842091BDD23A3D34F5E2ACD38"
+    TX=$(terrad tx wasm store $FOUNDATION_PATH --from $WALLET $TXFLAG --output json -y | jq -r '.txhash')
     echo "Store foundation contract tx hash: $TX"
 
     attempts=0
