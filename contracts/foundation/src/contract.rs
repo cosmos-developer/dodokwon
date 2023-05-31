@@ -731,50 +731,6 @@ mod test {
     }
 
     #[test]
-    fn send_cw20_after_proposal_passed() {
-        let mut deps = mock_dependencies();
-        let env = mock_env();
-        let info = mock_info("sender", &[]);
-
-        let max_voting_period = 10;
-        let threshold_percentage = 100;
-        let voters = vec![Voter {
-            addr: "voter1".into(),
-            weight: 1,
-        }];
-        let msg = InstantiateMsg {
-            cw20_address: Addr::unchecked("cw20_address"),
-            max_voting_period: Duration::Height(max_voting_period),
-            voters: voters.clone(),
-            threshold: Threshold::AbsolutePercentage {
-                percentage: Decimal::percent(threshold_percentage),
-            },
-        };
-        instantiate(deps.as_mut(), env.clone(), info, msg).unwrap();
-
-        let receiver = "receiver";
-        let proposal_type = msg::ProposalType::Send {
-            to: Addr::unchecked(receiver),
-            amount: Uint128::from(100u128),
-        };
-        let propose_msg = ExecuteMsg::Propose {
-            title: "title".to_string(),
-            description: "description".to_string(),
-            proposal_type: proposal_type.clone(),
-            msgs: vec![],
-            latest: None,
-        };
-        let voter1_info = mock_info(&voters[0].addr, &[]);
-        execute(deps.as_mut(), env.clone(), voter1_info, propose_msg.clone()).unwrap();
-
-        let proposal_id = 1;
-        let execute_proposal_msg = ExecuteMsg::Execute { proposal_id };
-        let any_info = mock_info("any", &[]);
-        let res = execute(deps.as_mut(), env.clone(), any_info, execute_proposal_msg);
-        assert!(res.is_ok());
-    }
-
-    #[test]
     fn add_voter_after_proposal_passed() {
         let mut deps = mock_dependencies();
         let env = mock_env();
@@ -910,5 +866,188 @@ mod test {
                 total_weight: total_weight - remove_voter.weight,
             }
         );
+    }
+
+    #[test]
+    fn send_cw20_after_proposal_passed() {
+        let mut deps = mock_dependencies();
+        let env = mock_env();
+        let info = mock_info("sender", &[]);
+
+        let max_voting_period = 10;
+        let threshold_percentage = 100;
+        let voters = vec![Voter {
+            addr: "voter1".into(),
+            weight: 1,
+        }];
+        let msg = InstantiateMsg {
+            cw20_address: Addr::unchecked("cw20_address"),
+            max_voting_period: Duration::Height(max_voting_period),
+            voters: voters.clone(),
+            threshold: Threshold::AbsolutePercentage {
+                percentage: Decimal::percent(threshold_percentage),
+            },
+        };
+        instantiate(deps.as_mut(), env.clone(), info, msg).unwrap();
+
+        let receiver = "receiver";
+        let proposal_type = msg::ProposalType::Send {
+            to: Addr::unchecked(receiver),
+            amount: Uint128::from(100u128),
+        };
+        let propose_msg = ExecuteMsg::Propose {
+            title: "title".to_string(),
+            description: "description".to_string(),
+            proposal_type: proposal_type.clone(),
+            msgs: vec![],
+            latest: None,
+        };
+        let voter1_info = mock_info(&voters[0].addr, &[]);
+        execute(deps.as_mut(), env.clone(), voter1_info, propose_msg.clone()).unwrap();
+
+        let proposal_id = 1;
+        let execute_proposal_msg = ExecuteMsg::Execute { proposal_id };
+        let any_info = mock_info("any", &[]);
+        let res = execute(deps.as_mut(), env.clone(), any_info, execute_proposal_msg);
+        assert!(res.is_ok());
+    }
+
+    mod integration {
+        use super::*;
+
+        use cw20::{BalanceResponse, Cw20Coin};
+        use cw20_base::{
+            contract::{
+                execute as cw20_execute, instantiate as cw20_instantiate, query as cw20_query,
+            },
+            msg::InstantiateMsg as Cw20InstantiateMsg,
+        };
+        use cw_multi_test::{App, ContractWrapper, Executor};
+
+        #[test]
+        fn propose_and_execute_and_send_cw20() {
+            let mut app = App::default();
+
+            let preditable_foundation_contract_address = Addr::unchecked("contract1");
+
+            let cw20_code = ContractWrapper::new(cw20_execute, cw20_instantiate, cw20_query);
+            let cw20_code_id = app.store_code(Box::new(cw20_code));
+            let foundation_amount = Uint128::new(1_000_000);
+            let cw20_address = app
+                .instantiate_contract(
+                    cw20_code_id,
+                    Addr::unchecked("sender"),
+                    &Cw20InstantiateMsg {
+                        name: "name".to_string(),
+                        symbol: "symbol".to_string(),
+                        decimals: 6,
+                        initial_balances: vec![Cw20Coin {
+                            address: preditable_foundation_contract_address.to_string(),
+                            amount: foundation_amount,
+                        }],
+                        mint: None,
+                        marketing: None,
+                    },
+                    &[],
+                    "Cw20Contract",
+                    None,
+                )
+                .unwrap();
+
+            let voter_address = Addr::unchecked("voter");
+            let foundation_code = ContractWrapper::new(execute, instantiate, query);
+            let foundation_code_id = app.store_code(Box::new(foundation_code));
+            let foundation_address = app
+                .instantiate_contract(
+                    foundation_code_id,
+                    Addr::unchecked("sender"),
+                    &InstantiateMsg {
+                        cw20_address: cw20_address.clone(),
+                        max_voting_period: Duration::Height(10),
+                        voters: vec![Voter {
+                            addr: voter_address.to_string(),
+                            weight: 1,
+                        }],
+                        threshold: Threshold::AbsolutePercentage {
+                            percentage: Decimal::percent(50),
+                        },
+                    },
+                    &[],
+                    "FoundationContract",
+                    None,
+                )
+                .unwrap();
+            assert_eq!(preditable_foundation_contract_address, foundation_address);
+
+            let send_to = Addr::unchecked("send_to");
+            let send_amount = Uint128::from(500u128);
+
+            // check balance before send proposal
+            let query_msg = cw20_base::msg::QueryMsg::Balance {
+                address: foundation_address.to_string(),
+            };
+            let res: BalanceResponse = app
+                .wrap()
+                .query_wasm_smart(&cw20_address, &query_msg)
+                .unwrap();
+            assert_eq!(res.balance, foundation_amount);
+
+            let query_msg = cw20_base::msg::QueryMsg::Balance {
+                address: send_to.to_string(),
+            };
+            let res: BalanceResponse = app
+                .wrap()
+                .query_wasm_smart(&cw20_address, &query_msg)
+                .unwrap();
+            assert_eq!(res.balance, Uint128::zero());
+
+            // send proposal
+            let proposal_type = msg::ProposalType::Send {
+                to: send_to.clone(),
+                amount: send_amount.clone(),
+            };
+            let propose_msg = ExecuteMsg::Propose {
+                title: "title".to_string(),
+                description: "description".to_string(),
+                proposal_type: proposal_type.clone(),
+                msgs: vec![],
+                latest: None,
+            };
+            app.execute_contract(voter_address, foundation_address.clone(), &propose_msg, &[])
+                .unwrap(); // vote is passed because of only one voter
+
+            // execute proposal
+            let proposal_id = 1;
+            let execute_proposal_msg = ExecuteMsg::Execute { proposal_id };
+            app.execute_contract(
+                Addr::unchecked("any"),
+                foundation_address.clone(),
+                &execute_proposal_msg,
+                &[],
+            )
+            .unwrap();
+
+            // check balance before send proposal
+            let query_msg = cw20_base::msg::QueryMsg::Balance {
+                address: foundation_address.to_string(),
+            };
+            let res: BalanceResponse = app
+                .wrap()
+                .query_wasm_smart(&cw20_address, &query_msg)
+                .unwrap();
+            assert_eq!(
+                res.balance,
+                foundation_amount.checked_sub(send_amount).unwrap()
+            );
+
+            let query_msg = cw20_base::msg::QueryMsg::Balance {
+                address: send_to.to_string(),
+            };
+            let res: BalanceResponse = app
+                .wrap()
+                .query_wasm_smart(&cw20_address, &query_msg)
+                .unwrap();
+            assert_eq!(res.balance, send_amount);
+        }
     }
 }

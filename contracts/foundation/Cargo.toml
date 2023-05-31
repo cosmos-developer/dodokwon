@@ -22,4 +22,5 @@ cw3 = "1.0.1"
 cw3-fixed-multisig = { version = "1.0.1", features = ["library"] }
 
 [dev-dependencies]
-cw-multi-test = "0.16.4"
+cw-multi-test = "0.13.4"
+cw20-base="1.0.1"
