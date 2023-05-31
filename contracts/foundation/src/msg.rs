@@ -27,7 +27,6 @@ pub enum ProposalType {
     },
     RemoveVoter {
         address: Addr,
-        vote_weight: u64,
     },
 }
 

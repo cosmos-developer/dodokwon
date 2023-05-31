@@ -134,35 +134,22 @@ mod execute {
             .add_attribute("status", format!("{:?}", prop.status));
 
         match proposal_type {
-            ProposalType::Send { to, amount } => {
-                res.clone()
-                    .add_attribute("action", "send")
-                    .add_attribute("send_to", to)
-                    .add_attribute("send_amount", amount);
-                Ok(res)
-            }
+            ProposalType::Send { to, amount } => Ok(res
+                .add_attribute("type", "send")
+                .add_attribute("send_to", to)
+                .add_attribute("send_amount", amount)),
             ProposalType::AddVoter {
                 address,
                 vote_weight,
                 info,
-            } => {
-                res.clone()
-                    .add_attribute("action", "add_voter")
-                    .add_attribute("voter", address)
-                    .add_attribute("vote_weight", vote_weight.to_string())
-                    .add_attribute("voter_info", info);
-                Ok(res)
-            }
-            ProposalType::RemoveVoter {
-                address,
-                vote_weight,
-            } => {
-                res.clone()
-                    .add_attribute("action", "remove_voter")
-                    .add_attribute("vote_weight", vote_weight.to_string())
-                    .add_attribute("voter", address);
-                Ok(res)
-            }
+            } => Ok(res
+                .add_attribute("type", "add_voter")
+                .add_attribute("voter", address)
+                .add_attribute("vote_weight", vote_weight.to_string())
+                .add_attribute("voter_info", info)),
+            ProposalType::RemoveVoter { address } => Ok(res
+                .add_attribute("type", "remove_voter")
+                .add_attribute("voter", address)),
         }
     }
 
@@ -207,12 +194,11 @@ mod execute {
                     funds: vec![],
                 };
 
-                res.clone()
+                Ok(res
                     .add_message(wasm_msg)
                     .add_attribute("action", "send")
                     .add_attribute("send_to", to)
-                    .add_attribute("send_amount", amount);
-                Ok(res)
+                    .add_attribute("send_amount", amount))
             }
             ProposalType::AddVoter {
                 address,
@@ -226,17 +212,14 @@ mod execute {
                     Ok(config)
                 })?;
 
-                res.clone()
+                Ok(res
                     .add_attribute("action", "add_voter")
                     .add_attribute("voter", address)
                     .add_attribute("vote_weight", vote_weight.to_string())
-                    .add_attribute("voter_info", info);
-                Ok(res)
+                    .add_attribute("voter_info", info))
             }
-            ProposalType::RemoveVoter {
-                address,
-                vote_weight,
-            } => {
+            ProposalType::RemoveVoter { address } => {
+                let vote_weight = VOTERS.load(deps.storage, &address)?; // check it exists
                 VOTERS.remove(deps.storage, &address);
                 CONFIG.update(deps.storage, |mut config| -> StdResult<_> {
                     let new_total_weight = config.total_weight - vote_weight;
@@ -244,11 +227,9 @@ mod execute {
                     Ok(config)
                 })?;
 
-                res.clone()
+                Ok(res
                     .add_attribute("action", "remove_voter")
-                    .add_attribute("vote_weight", vote_weight.to_string())
-                    .add_attribute("voter", address);
-                Ok(res)
+                    .add_attribute("voter", address))
             }
         }
     }
@@ -446,5 +427,488 @@ pub mod query {
             .collect::<StdResult<_>>()?;
 
         Ok(VoterListResponse { voters })
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::{
+        msg::{ProposalListResponse, ProposalResponse},
+        *,
+    };
+
+    use cosmwasm_std::{
+        from_binary,
+        testing::{mock_dependencies, mock_env, mock_info},
+        Addr, Decimal, Uint128,
+    };
+    use cw3::{
+        Status, VoteInfo, VoteListResponse, VoteResponse, VoterDetail, VoterListResponse,
+        VoterResponse,
+    };
+    use cw3_fixed_multisig::msg::Voter;
+    use cw_utils::{Duration, Threshold, ThresholdResponse};
+
+    #[test]
+    fn proper_instantiate() {
+        let mut deps = mock_dependencies();
+        let env = mock_env();
+        let info = mock_info("sender", &[]);
+
+        let voters = vec![
+            Voter {
+                addr: "voter1".into(),
+                weight: 1,
+            },
+            Voter {
+                addr: "voter2".into(),
+                weight: 2,
+            },
+        ];
+        let threshold_percentage = 60;
+        let msg = InstantiateMsg {
+            cw20_address: Addr::unchecked("cw20_address"),
+            max_voting_period: Duration::Height(10),
+            voters: voters.clone(),
+            threshold: Threshold::AbsolutePercentage {
+                percentage: Decimal::percent(threshold_percentage),
+            },
+        };
+        let res = instantiate(deps.as_mut(), env.clone(), info, msg).unwrap();
+        assert_eq!(0, res.messages.len());
+
+        // check the state
+        let query_threshold_msg = QueryMsg::Threshold {};
+        let bin_res = query(deps.as_ref(), env.clone(), query_threshold_msg).unwrap();
+        let res: ThresholdResponse = from_binary(&bin_res).unwrap();
+        assert_eq!(
+            res,
+            ThresholdResponse::AbsolutePercentage {
+                percentage: Decimal::percent(threshold_percentage),
+                total_weight: voters.iter().map(|v| v.weight).sum(),
+            }
+        );
+
+        let query_voters_msg = QueryMsg::ListVoters {
+            start_after: None,
+            limit: None,
+        };
+        let bin_res = query(deps.as_ref(), env.clone(), query_voters_msg).unwrap();
+        let res: VoterListResponse = from_binary(&bin_res).unwrap();
+        assert_eq!(
+            res,
+            VoterListResponse {
+                voters: voters
+                    .iter()
+                    .map(|v| VoterDetail {
+                        addr: v.addr.clone(),
+                        weight: v.weight
+                    })
+                    .collect()
+            }
+        );
+    }
+
+    #[test]
+    fn only_voter_propose() {
+        let mut deps = mock_dependencies();
+        let env = mock_env();
+        let info = mock_info("sender", &[]);
+
+        let max_voting_period = 10;
+        let threshold_percentage = 100;
+        let voters = vec![
+            Voter {
+                addr: "voter1".into(),
+                weight: 1,
+            },
+            Voter {
+                addr: "voter2".into(),
+                weight: 1,
+            },
+        ];
+        let msg = InstantiateMsg {
+            cw20_address: Addr::unchecked("cw20_address"),
+            max_voting_period: Duration::Height(max_voting_period),
+            voters: voters.clone(),
+            threshold: Threshold::AbsolutePercentage {
+                percentage: Decimal::percent(threshold_percentage),
+            },
+        };
+        instantiate(deps.as_mut(), env.clone(), info, msg).unwrap();
+
+        let proposal_title = "title";
+        let proposal_description = "description";
+        let proposal_type = msg::ProposalType::AddVoter {
+            address: Addr::unchecked("new_voter"),
+            vote_weight: 1,
+            info: "info".to_string(),
+        };
+        let propose_msg = ExecuteMsg::Propose {
+            title: proposal_title.to_string(),
+            description: proposal_description.to_string(),
+            proposal_type: proposal_type.clone(),
+            msgs: vec![],
+            latest: None,
+        };
+
+        let invalid_info = mock_info("invalid", &[]);
+        let res = execute(
+            deps.as_mut(),
+            env.clone(),
+            invalid_info,
+            propose_msg.clone(),
+        );
+        assert!(res.is_err());
+
+        let voter1_info = mock_info(&voters[0].addr, &[]);
+        let res = execute(deps.as_mut(), env.clone(), voter1_info, propose_msg.clone());
+        assert!(res.is_ok());
+
+        // query the proposal state
+        let query_list_proposals_msg = QueryMsg::ListProposals {
+            start_after: None,
+            limit: None,
+        };
+        let bin_res = query(deps.as_ref(), env.clone(), query_list_proposals_msg).unwrap();
+        let res: ProposalListResponse = from_binary(&bin_res).unwrap();
+        assert_eq!(res.proposals.len(), 1);
+
+        let query_proposal_msg = QueryMsg::Proposal { proposal_id: 1 };
+        let bin_res = query(deps.as_ref(), env.clone(), query_proposal_msg).unwrap();
+        let res: ProposalResponse = from_binary(&bin_res).unwrap();
+        assert_eq!(
+            res,
+            ProposalResponse {
+                id: 1,
+                title: proposal_title.to_string(),
+                description: proposal_description.to_string(),
+                proposal_type: proposal_type.clone(),
+                msgs: vec![],
+                status: Status::Open,
+                expires: cw_utils::Expiration::AtHeight(env.block.height + max_voting_period),
+                threshold: ThresholdResponse::AbsolutePercentage {
+                    percentage: Decimal::percent(threshold_percentage),
+                    total_weight: voters.iter().map(|v| v.weight).sum()
+                },
+                proposer: Addr::unchecked(voters[0].addr.clone()),
+                deposit: None
+            }
+        );
+    }
+
+    #[test]
+    fn only_voter_vote() {
+        let mut deps = mock_dependencies();
+        let env = mock_env();
+        let info = mock_info("sender", &[]);
+
+        let max_voting_period = 10;
+        let threshold_percentage = 100;
+        let voters = vec![
+            Voter {
+                addr: "voter1".into(),
+                weight: 1,
+            },
+            Voter {
+                addr: "voter2".into(),
+                weight: 1,
+            },
+        ];
+        let msg = InstantiateMsg {
+            cw20_address: Addr::unchecked("cw20_address"),
+            max_voting_period: Duration::Height(max_voting_period),
+            voters: voters.clone(),
+            threshold: Threshold::AbsolutePercentage {
+                percentage: Decimal::percent(threshold_percentage),
+            },
+        };
+        instantiate(deps.as_mut(), env.clone(), info, msg).unwrap();
+
+        let proposal_title = "title";
+        let proposal_description = "description";
+        let proposal_type = msg::ProposalType::AddVoter {
+            address: Addr::unchecked("new_voter"),
+            vote_weight: 1,
+            info: "info".to_string(),
+        };
+        let propose_msg = ExecuteMsg::Propose {
+            title: proposal_title.to_string(),
+            description: proposal_description.to_string(),
+            proposal_type: proposal_type.clone(),
+            msgs: vec![],
+            latest: None,
+        };
+        let voter1_info = mock_info(&voters[0].addr, &[]);
+        execute(deps.as_mut(), env.clone(), voter1_info, propose_msg.clone()).unwrap();
+
+        let proposal_id = 1;
+        let vote = cw3::Vote::Yes;
+        let vote_msg = ExecuteMsg::Vote {
+            proposal_id,
+            vote: vote.clone(),
+        };
+
+        let invalid_info = mock_info("invalid", &[]);
+        let res = execute(deps.as_mut(), env.clone(), invalid_info, vote_msg.clone());
+        assert!(res.is_err());
+
+        let voter2_info = mock_info(&voters[1].addr, &[]);
+        let res = execute(deps.as_mut(), env.clone(), voter2_info, vote_msg.clone());
+        assert!(res.is_ok());
+
+        // check the state
+        let query_list_votes_msg = QueryMsg::ListVotes {
+            proposal_id,
+            start_after: None,
+            limit: None,
+        };
+        let bin_res = query(deps.as_ref(), env.clone(), query_list_votes_msg).unwrap();
+        let res: VoteListResponse = from_binary(&bin_res).unwrap();
+        assert_eq!(res.votes.len(), 2); // of voter1 and voter2
+
+        let query_proposal_msg = QueryMsg::Vote {
+            proposal_id,
+            voter: voters[1].addr.to_string(),
+        };
+        let bin_res = query(deps.as_ref(), env.clone(), query_proposal_msg).unwrap();
+        let res: VoteResponse = from_binary(&bin_res).unwrap();
+        assert!(res.vote.is_some());
+        assert_eq!(
+            res,
+            VoteResponse {
+                vote: Some(VoteInfo {
+                    proposal_id,
+                    voter: voters[1].addr.to_string(),
+                    vote: vote.clone(),
+                    weight: voters[1].weight,
+                })
+            }
+        );
+    }
+
+    #[test]
+    fn execute_after_proposal_passed() {
+        let mut deps = mock_dependencies();
+        let env = mock_env();
+        let info = mock_info("sender", &[]);
+
+        let max_voting_period = 10;
+        let threshold_percentage = 100;
+        let voters = vec![Voter {
+            addr: "voter1".into(),
+            weight: 1,
+        }];
+        let msg = InstantiateMsg {
+            cw20_address: Addr::unchecked("cw20_address"),
+            max_voting_period: Duration::Height(max_voting_period),
+            voters: voters.clone(),
+            threshold: Threshold::AbsolutePercentage {
+                percentage: Decimal::percent(threshold_percentage),
+            },
+        };
+        instantiate(deps.as_mut(), env.clone(), info, msg).unwrap();
+
+        let propose_msg = ExecuteMsg::Propose {
+            title: "title".to_string(),
+            description: "description".to_string(),
+            proposal_type: msg::ProposalType::AddVoter {
+                address: Addr::unchecked("new_voter"),
+                vote_weight: 1,
+                info: "info".to_string(),
+            },
+            msgs: vec![],
+            latest: None,
+        };
+        let voter1_info = mock_info(&voters[0].addr, &[]);
+        execute(deps.as_mut(), env.clone(), voter1_info, propose_msg.clone()).unwrap();
+
+        let proposal_id = 1;
+        let execute_proposal_msg = ExecuteMsg::Execute { proposal_id };
+        let any_info = mock_info("any", &[]);
+        let res = execute(deps.as_mut(), env.clone(), any_info, execute_proposal_msg);
+        assert!(res.is_ok());
+    }
+
+    #[test]
+    fn send_cw20_after_proposal_passed() {
+        let mut deps = mock_dependencies();
+        let env = mock_env();
+        let info = mock_info("sender", &[]);
+
+        let max_voting_period = 10;
+        let threshold_percentage = 100;
+        let voters = vec![Voter {
+            addr: "voter1".into(),
+            weight: 1,
+        }];
+        let msg = InstantiateMsg {
+            cw20_address: Addr::unchecked("cw20_address"),
+            max_voting_period: Duration::Height(max_voting_period),
+            voters: voters.clone(),
+            threshold: Threshold::AbsolutePercentage {
+                percentage: Decimal::percent(threshold_percentage),
+            },
+        };
+        instantiate(deps.as_mut(), env.clone(), info, msg).unwrap();
+
+        let receiver = "receiver";
+        let proposal_type = msg::ProposalType::Send {
+            to: Addr::unchecked(receiver),
+            amount: Uint128::from(100u128),
+        };
+        let propose_msg = ExecuteMsg::Propose {
+            title: "title".to_string(),
+            description: "description".to_string(),
+            proposal_type: proposal_type.clone(),
+            msgs: vec![],
+            latest: None,
+        };
+        let voter1_info = mock_info(&voters[0].addr, &[]);
+        execute(deps.as_mut(), env.clone(), voter1_info, propose_msg.clone()).unwrap();
+
+        let proposal_id = 1;
+        let execute_proposal_msg = ExecuteMsg::Execute { proposal_id };
+        let any_info = mock_info("any", &[]);
+        let res = execute(deps.as_mut(), env.clone(), any_info, execute_proposal_msg);
+        assert!(res.is_ok());
+    }
+
+    #[test]
+    fn add_voter_after_proposal_passed() {
+        let mut deps = mock_dependencies();
+        let env = mock_env();
+        let info = mock_info("sender", &[]);
+
+        let max_voting_period = 10;
+        let threshold_percentage = 100;
+        let voters = vec![Voter {
+            addr: "voter1".into(),
+            weight: 1,
+        }];
+        let msg = InstantiateMsg {
+            cw20_address: Addr::unchecked("cw20_address"),
+            max_voting_period: Duration::Height(max_voting_period),
+            voters: voters.clone(),
+            threshold: Threshold::AbsolutePercentage {
+                percentage: Decimal::percent(threshold_percentage),
+            },
+        };
+        instantiate(deps.as_mut(), env.clone(), info, msg).unwrap();
+
+        let new_voter = "new_voter";
+        let proposal_type = msg::ProposalType::AddVoter {
+            address: Addr::unchecked(new_voter),
+            vote_weight: 1,
+            info: "info".to_string(),
+        };
+        let propose_msg = ExecuteMsg::Propose {
+            title: "title".to_string(),
+            description: "description".to_string(),
+            proposal_type: proposal_type.clone(),
+            msgs: vec![],
+            latest: None,
+        };
+        let voter1_info = mock_info(&voters[0].addr, &[]);
+        execute(deps.as_mut(), env.clone(), voter1_info, propose_msg.clone()).unwrap();
+
+        let proposal_id = 1;
+        let execute_proposal_msg = ExecuteMsg::Execute { proposal_id };
+        let any_info = mock_info("any", &[]);
+        let res = execute(deps.as_mut(), env.clone(), any_info, execute_proposal_msg);
+        assert!(res.is_ok());
+
+        // check the state
+        let query_voter_msg = QueryMsg::Voter {
+            address: new_voter.to_string(),
+        };
+        let bin_res = query(deps.as_ref(), env.clone(), query_voter_msg).unwrap();
+        let res: VoterResponse = from_binary(&bin_res).unwrap();
+        assert_eq!(res, VoterResponse { weight: Some(1) });
+    }
+
+    #[test]
+    fn remove_voter_after_proposal_passed() {
+        let mut deps = mock_dependencies();
+        let env = mock_env();
+        let info = mock_info("sender", &[]);
+
+        let max_voting_period = 10;
+        let threshold_percentage = 50;
+        let voters = vec![
+            Voter {
+                addr: "voter1".into(),
+                weight: 1,
+            },
+            Voter {
+                addr: "voter2".into(),
+                weight: 1,
+            },
+        ];
+        let total_weight = voters.iter().map(|v| v.weight).sum::<u64>();
+        let msg = InstantiateMsg {
+            cw20_address: Addr::unchecked("cw20_address"),
+            max_voting_period: Duration::Height(max_voting_period),
+            voters: voters.clone(),
+            threshold: Threshold::AbsolutePercentage {
+                percentage: Decimal::percent(threshold_percentage),
+            },
+        };
+        instantiate(deps.as_mut(), env.clone(), info, msg).unwrap();
+
+        let remove_voter = voters[1].clone();
+        let proposal_type = msg::ProposalType::RemoveVoter {
+            address: Addr::unchecked(&remove_voter.addr),
+        };
+        let propose_msg = ExecuteMsg::Propose {
+            title: "title".to_string(),
+            description: "description".to_string(),
+            proposal_type: proposal_type.clone(),
+            msgs: vec![],
+            latest: None,
+        };
+        let voter1_info = mock_info(&voters[0].addr, &[]);
+        execute(deps.as_mut(), env.clone(), voter1_info, propose_msg.clone()).unwrap();
+
+        let proposal_id = 1;
+        let execute_proposal_msg = ExecuteMsg::Execute { proposal_id };
+        let any_info = mock_info("any", &[]);
+        let res = execute(deps.as_mut(), env.clone(), any_info, execute_proposal_msg);
+        assert!(res.is_ok());
+
+        // check the state
+        let query_voter_msg = QueryMsg::Voter {
+            address: remove_voter.addr.to_string(),
+        };
+        let bin_res = query(deps.as_ref(), env.clone(), query_voter_msg).unwrap();
+        let res: VoterResponse = from_binary(&bin_res).unwrap();
+        assert_eq!(res, VoterResponse { weight: None });
+
+        let query_vote_list_msg = QueryMsg::ListVoters {
+            start_after: None,
+            limit: None,
+        };
+        let bin_res = query(deps.as_ref(), env.clone(), query_vote_list_msg).unwrap();
+        let res: VoterListResponse = from_binary(&bin_res).unwrap();
+        assert_eq!(
+            res,
+            VoterListResponse {
+                voters: vec![VoterDetail {
+                    addr: voters[0].addr.clone(),
+                    weight: voters[0].weight,
+                }],
+            }
+        );
+
+        let query_threshold_msg = QueryMsg::Threshold {};
+        let bin_res = query(deps.as_ref(), env.clone(), query_threshold_msg).unwrap();
+        let res: ThresholdResponse = from_binary(&bin_res).unwrap();
+        assert_eq!(
+            res,
+            ThresholdResponse::AbsolutePercentage {
+                percentage: Decimal::percent(threshold_percentage),
+                total_weight: total_weight - remove_voter.weight,
+            }
+        );
     }
 }
