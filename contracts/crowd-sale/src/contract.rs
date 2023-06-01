@@ -62,11 +62,11 @@ mod execute {
 
         let uluna_uusd = exchange_rates.exchange_rates[0].exchange_rate;
         let udodokwan_uusd = UDODOKWAN_UUSD.load(deps.storage).unwrap();
-        let udodokwan_uluna = udodokwan_uusd.checked_div(uluna_uusd).unwrap();
+        let uluna_udodokwan = uluna_uusd.checked_div(udodokwan_uusd).unwrap();
 
         let uluna_amount = cw_utils::must_pay(&info, &base_denom)?;
         let uluna_amount = Decimal::from_atomics(uluna_amount, 0).unwrap();
-        let udodokwan_amount = udodokwan_uluna.checked_mul(uluna_amount).unwrap();
+        let udodokwan_amount = uluna_udodokwan.checked_mul(uluna_amount).unwrap();
 
         let amount = udodokwan_amount.to_uint_floor();
         if amount == Uint128::zero() {
@@ -137,10 +137,10 @@ mod query {
 
         let uluna_uusd = exchange_rates.exchange_rates[0].exchange_rate;
         let udodokwan_uusd = UDODOKWAN_UUSD.load(deps.storage)?;
-        let uluna_per_udodokwan = uluna_uusd.checked_div(udodokwan_uusd).unwrap();
+        let udodokwan_uluna = udodokwan_uusd.checked_div(uluna_uusd).unwrap();
 
         let udodokwan_amount = Decimal::from_atomics(udodokwan_amount, 0).unwrap();
-        let uluna_amount = uluna_per_udodokwan.checked_mul(udodokwan_amount).unwrap();
+        let uluna_amount = udodokwan_uluna.checked_mul(udodokwan_amount).unwrap();
 
         Ok(UdodokwanToUlunaResp { uluna_amount })
     }
