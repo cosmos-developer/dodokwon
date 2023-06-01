@@ -50,6 +50,8 @@ TRANSFER=$(terrad tx wasm execute $CW20_BASE_ADDRESS $TRANSFER_ARGS --from $WALL
 TRANSFER_TX_HASH=$(echo $TRANSFER | jq -r .txhash)
 echo -e "\nTransfer tx hash: $TRANSFER_TX_HASH"
 
+sleep 5
+
 QUERY_WALLET_BALANCE_ARGS="{\"balance\":{\"address\":\"$WALLET_ADDRESS\"}}" 
 AFTER_TRANSFER_INITIALIZER_BALANCE=$(terrad query wasm contract-state smart $CW20_BASE_ADDRESS $QUERY_WALLET_BALANCE_ARGS $NODE --output json | jq -r .data.balance)
 echo -e "\nAfter transfer Balance of initializer: $AFTER_TRANSFER_INITIALIZER_BALANCE"
@@ -61,16 +63,18 @@ echo -e "After transfer Balance of foundation: $AFTER_TRANSFER_FOUNDATION_BALANC
 # Update minter
 echo -e "\n\n========== Update minter =========="
 echo -e "\nInitilizer: $WALLET_ADDRESS"
-echo -e "Foundation contract: $FOUNDATION_ADDRESS"
+echo -e "Crowd sale contract: $CROWD_SALE_ADDRESS"
 
 QUERY_MINTER_ARGS="{\"minter\":{}}" 
 MINTER_INFO=$(terrad query wasm contract-state smart $CW20_BASE_ADDRESS $QUERY_MINTER_ARGS $NODE --output json | jq -r .data )
 echo -e "\nInitial Minter info: $MINTER_INFO"
 
-UPDATE_MINTER_ARGS="{\"update_minter\":{\"new_minter\":\"$FOUNDATION_ADDRESS\"}}"
+UPDATE_MINTER_ARGS="{\"update_minter\":{\"new_minter\":\"$CROWD_SALE_ADDRESS\"}}"
 UPDATE_MINTER=$(terrad tx wasm execute $CW20_BASE_ADDRESS $UPDATE_MINTER_ARGS --from $WALLET $TXFLAG -y --output json)
 UPDATE_MINTER_TX_HASH=$(echo $UPDATE_MINTER | jq -r .txhash)
 echo -e "\nUpdate minter tx hash: $UPDATE_MINTER_TX_HASH"
+
+sleep 5
 
 QUERY_MINTER_ARGS="{\"minter\":{}}"
 MINTER_INFO=$(terrad query wasm contract-state smart $CW20_BASE_ADDRESS $QUERY_MINTER_ARGS $NODE --output json | jq -r .data )

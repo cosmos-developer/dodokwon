@@ -29,7 +29,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 NODE="--node $RPC"
-TXFLAG="$NODE --chain-id $CHAIN_ID --gas-prices 2500000uluna --gas-adjustment 1.3"
+TXFLAG="$NODE --chain-id $CHAIN_ID --gas-prices 25000000uluna --gas-adjustment 1.3"
 WALLET_ADDRESS=$(terrad keys list --output json | jq -r "[ .[] | select( .name == \"$WALLET\") ][0].address")
 
 MAX_ATTEMPTS=2
@@ -42,8 +42,8 @@ if [ -z "$ONLY_CONTRACT" ] || [ "$ONLY_CONTRACT" = "cw20-base" ]; then
 
     echo -e "\n\nInstantiating cw20 base contract..."
     INITIAL_STATE="{\"name\" : \"MyCoin\", \"symbol\": \"MCO\", \"decimals\": 6, \"initial_balances\": [{\"address\": \"$WALLET_ADDRESS\", \"amount\": \"3000\"}], \"mint\": {\"minter\": \"$WALLET_ADDRESS\", \"cap\": \"100000\"}}"
-    INSTANTIATE_TX=$(terrad tx wasm instantiate $CW20_CODE_ID "$INITIAL_STATE" --from $WALLET $TXFLAG -y --no-admin --output json | jq -r .txhash)
-
+    INSTANTIATE_TX=$(terrad tx wasm instantiate $CW20_CODE_ID "$INITIAL_STATE" --label "cw20-base" --from $WALLET $TXFLAG -y --no-admin --output json | jq -r .txhash)
+    
     attempts=0
     success=false
     while [ $attempts -lt $MAX_ATTEMPTS ] && [ "$success" = false ]; do
@@ -74,7 +74,7 @@ if [ -z "$ONLY_CONTRACT" ] || [ "$ONLY_CONTRACT" = "crowd-sale" ]; then
 
     echo -e "\n\nInstantiating crowd sale contract..."
     INITIAL_STATE="{\"cw20_address\" : \"$CW20_BASE_ADDRESS\", \"mintable_period_days\": 30, \"udodokwan_per_uusd\": \"0.000000001\"}"
-    INSTANTIATE_TX=$(terrad tx wasm instantiate $CROWD_SALE_CODE_ID "$INITIAL_STATE" --from $WALLET $TXFLAG -y --no-admin --output json | jq -r .txhash)
+    INSTANTIATE_TX=$(terrad tx wasm instantiate $CROWD_SALE_CODE_ID "$INITIAL_STATE" --label "crowd-sale" --from $WALLET $TXFLAG -y --no-admin --output json | jq -r .txhash)
 
     attempts=0
     success=false
@@ -91,7 +91,7 @@ if [ -z "$ONLY_CONTRACT" ] || [ "$ONLY_CONTRACT" = "crowd-sale" ]; then
         fi
     done
     if [ "$success" = false ]; then
-        echo "Exceeded maximum attempts. Unable to retrieve CONTRACT_ADDRESS."
+        echo "Exceeded maximum attempts. Unable to retrieve crowd sale address."
         exit 1
     fi
 fi
@@ -107,7 +107,7 @@ if [ -z "$ONLY_CONTRACT" ] || [ "$ONLY_CONTRACT" = "foundation" ]; then
 
     echo -e "\n\nInstantiating foundation contract..."
     INITIAL_STATE="{\"cw20_address\" : \"$CW20_BASE_ADDRESS\", \"max_voting_period\": { \"height\": 300 }, \"threshold\": { \"absolute_percentage\": { \"percentage\": \"0.5\" } }, \"voters\": [{\"addr\": \"$WALLET_ADDRESS\", \"weight\": 1}]}"
-    INSTANTIATE_TX=$(terrad tx wasm instantiate $FOUNDATION_CODE_ID "$INITIAL_STATE" --from $WALLET $TXFLAG -y --no-admin --output json | jq -r .txhash)
+    INSTANTIATE_TX=$(terrad tx wasm instantiate $FOUNDATION_CODE_ID "$INITIAL_STATE" --label "foundation" --from $WALLET $TXFLAG -y --no-admin --output json | jq -r .txhash)
         
     attempts=0
     success=false
@@ -124,7 +124,7 @@ if [ -z "$ONLY_CONTRACT" ] || [ "$ONLY_CONTRACT" = "foundation" ]; then
         fi
     done
     if [ "$success" = false ]; then
-        echo "Exceeded maximum attempts. Unable to retrieve CONTRACT_ADDRESS."
+        echo "Exceeded maximum attempts. Unable to retrieve foundation address."
         exit 1
     fi
 fi
