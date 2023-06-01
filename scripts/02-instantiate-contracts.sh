@@ -41,7 +41,7 @@ if [ -z "$ONLY_CONTRACT" ] || [ "$ONLY_CONTRACT" = "cw20-base" ]; then
     CW20_CODE_ID=$(cat ./store/cw20-base-store-data.json | jq -r .code_id)
 
     echo -e "\n\nInstantiating cw20 base contract..."
-    INITIAL_STATE="{\"name\" : \"MyCoin\", \"symbol\": \"MCO\", \"decimals\": 6, \"initial_balances\": [{\"address\": \"$WALLET_ADDRESS\", \"amount\": \"3000\"}], \"mint\": {\"minter\": \"$WALLET_ADDRESS\", \"cap\": \"100000\"}}"
+    INITIAL_STATE="{\"name\" : \"DoDoKwan\", \"symbol\": \"DDK\", \"decimals\": 6, \"initial_balances\": [{\"address\": \"$WALLET_ADDRESS\", \"amount\": \"32523579000000\"}], \"mint\": {\"minter\": \"$WALLET_ADDRESS\", \"cap\": \"413786000000000\"}}"
     INSTANTIATE_TX=$(terrad tx wasm instantiate $CW20_CODE_ID "$INITIAL_STATE" --label "cw20-base" --from $WALLET $TXFLAG -y --no-admin --output json | jq -r .txhash)
     
     attempts=0
