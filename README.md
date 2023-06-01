@@ -1,4 +1,4 @@
-### 0. Prepare
+## 0. Prepare
 
 ```sh
 $ cd scripts
@@ -6,7 +6,7 @@ $ cd scripts
 $ sudo chmod +x *
 ```
 
-### 1. Store all contracts
+## 1. Store all contracts
 
 ```sh
 $ ./01-store-all-contracts.sh <WALLET> \
@@ -16,7 +16,7 @@ $ ./01-store-all-contracts.sh <WALLET> \
   --network testnet
 ```
 
-### 2. Instantiate CW20 base
+## 2. Instantiate CW20 base
 
 - Instantiate CW20 base with both of foundation and minter roles assigned to caller.
 - Once foundation and crowd sale contracts are deployed:
@@ -28,3 +28,9 @@ $ ./02-predict-contract-addresses.sh <WALLET> --network testnet
 ```
 
 If an error occurs while instantiating a contract, you can use the `--only-contract` flag with the following values: `cw20-base`, `crowd-sale`, or `foundation`.
+
+## 3. Transfer CW20 to Foundation and Update Minter to Crowd Sale
+
+```sh
+$ ./03-transfer-and-update-minter.sh <WALLET> --network testnet
+```
