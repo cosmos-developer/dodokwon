@@ -409,15 +409,11 @@
               "type": "object",
               "required": [
                 "address",
-                "info",
                 "vote_weight"
               ],
               "properties": {
                 "address": {
                   "$ref": "#/definitions/Addr"
-                },
-                "info": {
-                  "type": "string"
                 },
                 "vote_weight": {
                   "type": "integer",

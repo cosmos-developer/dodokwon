@@ -16,18 +16,9 @@ pub struct InstantiateMsg {
 
 #[cw_serde]
 pub enum ProposalType {
-    Send {
-        to: Addr,
-        amount: Uint128,
-    },
-    AddVoter {
-        address: Addr,
-        vote_weight: u64,
-        info: String,
-    },
-    RemoveVoter {
-        address: Addr,
-    },
+    Send { to: Addr, amount: Uint128 },
+    AddVoter { address: Addr, vote_weight: u64 },
+    RemoveVoter { address: Addr },
 }
 
 #[cw_serde]

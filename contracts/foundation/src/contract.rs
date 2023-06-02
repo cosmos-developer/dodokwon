@@ -141,12 +141,10 @@ mod execute {
             ProposalType::AddVoter {
                 address,
                 vote_weight,
-                info,
             } => Ok(res
                 .add_attribute("type", "add_voter")
                 .add_attribute("voter", address)
-                .add_attribute("vote_weight", vote_weight.to_string())
-                .add_attribute("voter_info", info)),
+                .add_attribute("vote_weight", vote_weight.to_string())),
             ProposalType::RemoveVoter { address } => Ok(res
                 .add_attribute("type", "remove_voter")
                 .add_attribute("voter", address)),
@@ -203,7 +201,6 @@ mod execute {
             ProposalType::AddVoter {
                 address,
                 vote_weight,
-                info,
             } => {
                 VOTERS.save(deps.storage, &address, &vote_weight)?;
                 CONFIG.update(deps.storage, |mut config| -> StdResult<_> {
@@ -215,8 +212,7 @@ mod execute {
                 Ok(res
                     .add_attribute("action", "add_voter")
                     .add_attribute("voter", address)
-                    .add_attribute("vote_weight", vote_weight.to_string())
-                    .add_attribute("voter_info", info))
+                    .add_attribute("vote_weight", vote_weight.to_string()))
             }
             ProposalType::RemoveVoter { address } => {
                 let vote_weight = VOTERS.load(deps.storage, &address)?; // check it exists
@@ -542,7 +538,6 @@ mod test {
         let proposal_type = msg::ProposalType::AddVoter {
             address: Addr::unchecked("new_voter"),
             vote_weight: 1,
-            info: "info".to_string(),
         };
         let propose_msg = ExecuteMsg::Propose {
             title: proposal_title.to_string(),
@@ -630,7 +625,6 @@ mod test {
         let proposal_type = msg::ProposalType::AddVoter {
             address: Addr::unchecked("new_voter"),
             vote_weight: 1,
-            info: "info".to_string(),
         };
         let propose_msg = ExecuteMsg::Propose {
             title: proposal_title.to_string(),
@@ -715,7 +709,6 @@ mod test {
             proposal_type: msg::ProposalType::AddVoter {
                 address: Addr::unchecked("new_voter"),
                 vote_weight: 1,
-                info: "info".to_string(),
             },
             msgs: vec![],
             latest: None,
@@ -756,7 +749,6 @@ mod test {
         let proposal_type = msg::ProposalType::AddVoter {
             address: Addr::unchecked(new_voter),
             vote_weight: 1,
-            info: "info".to_string(),
         };
         let propose_msg = ExecuteMsg::Propose {
             title: "title".to_string(),
