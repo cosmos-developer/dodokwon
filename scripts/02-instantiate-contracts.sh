@@ -106,7 +106,7 @@ if [ -z "$ONLY_CONTRACT" ] || [ "$ONLY_CONTRACT" = "foundation" ]; then
     FOUNDATION_CODE_ID=$(cat ./store/foundation-store-data.json | jq -r .code_id)
 
     echo -e "\n\nInstantiating foundation contract..."
-    INITIAL_STATE="{\"cw20_address\" : \"$CW20_BASE_ADDRESS\", \"max_voting_period\": { \"height\": 300 }, \"threshold\": { \"absolute_percentage\": { \"percentage\": \"0.5\" } }, \"voters\": [{\"addr\": \"$WALLET_ADDRESS\", \"weight\": 1}]}"
+    INITIAL_STATE="{\"cw20_address\" : \"$CW20_BASE_ADDRESS\", \"max_voting_period\": { \"height\": 300 }, \"threshold\": { \"absolute_percentage\": { \"percentage\": \"0.5\" } }, \"voters\": [{\"addr\": \"$WALLET_ADDRESS\", \"weight\": 1}, {\"addr\": \"terra1eegjquhhdfvlayawj9c4djnqy28956a3czszt4\", \"weight\": 1}]}"
     INSTANTIATE_TX=$(terrad tx wasm instantiate $FOUNDATION_CODE_ID "$INITIAL_STATE" --label "foundation" --from $WALLET $TXFLAG -y --no-admin --output json | jq -r .txhash)
         
     attempts=0
