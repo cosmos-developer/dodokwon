@@ -34,3 +34,26 @@ If an error occurs while instantiating a contract, you can use the `--only-contr
 ```sh
 $ ./03-transfer-and-update-minter.sh <WALLET> --network testnet
 ```
+
+## 4. Try execute
+
+- Buyer call mint in crowd sale contract
+
+```sh
+$ ./04-try-query-and-execute.sh <BUYER-WALLET> --network testnet \
+  -action mint --uluna <AMOUNT>
+```
+
+- Add new voter
+
+```sh
+$ ./04-try-query-and-execute.sh <CURRENT_VOTER_WALLET> --network testnet \
+  --action add-voter --voter <NEW_VOTER_WALLET>
+```
+
+- Send cw20
+
+```sh
+$ ./04-try-query-and-execute.sh <VOTER_WALLET_1> --network testnet \
+  --action send --voter <VOTER_WALLET__2>
+```
