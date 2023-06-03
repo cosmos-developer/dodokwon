@@ -29,7 +29,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 NODE="--node $RPC"
-TXFLAG="$NODE --chain-id $CHAIN_ID --gas-prices 25000000uluna --gas-adjustment 1.3"
+TXFLAG="$NODE --chain-id $CHAIN_ID --gas-prices 500000uluna --gas-adjustment 1.3"
 WALLET_ADDRESS=$(terrad keys list --output json | jq -r "[ .[] | select( .name == \"$WALLET\") ][0].address")
 
 MAX_ATTEMPTS=2
