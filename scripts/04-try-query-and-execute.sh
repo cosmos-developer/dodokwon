@@ -55,10 +55,18 @@ if [ "$ACTION" = "mint" ]; then
         echo -e "Expect --uluna <amount>"
         exit 1
     fi
+    
+    burned_txs=$(terrad q txs --events 'burn.burner=terra1xds4f0m87ajl3a6az6s2enhxrd0wta48kzx23l&burn.amount=10000uluna' --node http://85.214.56.241:26657 -o json | jq -r '.total_count')
+    echo -e "\nBurned amount from chain: ${burned_txs}00000uluna"
+
     echo -e "\n========== Buyer call mint $ULUNA uluna in crowd sale contract =========="
     QUERY_WALLET_BALANCE_ARGS="{\"balance\":{\"address\":\"$WALLET_ADDRESS\"}}"
     INITIAL_BUYER_BALANCE=$(terrad query wasm contract-state smart $CW20_BASE_ADDRESS $QUERY_WALLET_BALANCE_ARGS $NODE --output json | jq -r .data.balance)
     echo -e "\nBefore mint Balance of Buyer: $INITIAL_BUYER_BALANCE udodokwon"
+
+    QUERY_RATE_ARGS="{\"udodokwan_to_uluna\":{\"udodokwan_amount\":\"1000000\"}}"
+    RATE=$(terrad query wasm contract-state smart $CROWD_SALE_ADDRESS $QUERY_RATE_ARGS $NODE --output json | jq -r .data.uluna_amount)
+    echo -e "\nRate: 1000000udodokwan = $RATE uluna"
 
     MINT_ARGS="{\"mint\":{}}"
     MINT=$(terrad tx wasm execute $CROWD_SALE_ADDRESS $MINT_ARGS --amount "$ULUNA"uluna --from $WALLET $TXFLAG  -y --output json)
@@ -71,6 +79,13 @@ if [ "$ACTION" = "mint" ]; then
     QUERY_WALLET_BALANCE_ARGS="{\"balance\":{\"address\":\"$WALLET_ADDRESS\"}}"
     AFTER_MINT_BUYER_BALANCE=$(terrad query wasm contract-state smart $CW20_BASE_ADDRESS $QUERY_WALLET_BALANCE_ARGS $NODE --output json | jq -r .data.balance)
     echo -e "\nAfter mint Balance of Buyer: $AFTER_MINT_BUYER_BALANCE udodokwon"
+
+    QUERY_BURNED_LUNA_ARGS="{\"burned_uluna\":{}}"
+    QUERY_BURNED_LUNA=$(terrad query wasm contract-state smart $CROWD_SALE_ADDRESS $QUERY_BURNED_LUNA_ARGS $NODE --output json | jq -r .data.burned_uluna)
+    echo -e "\nquery burned luna from smart contract: ${QUERY_BURNED_LUNA}uluna"
+
+    burned_txs=$(terrad q txs --events 'burn.burner=terra1xds4f0m87ajl3a6az6s2enhxrd0wta48kzx23l&burn.amount=10000uluna' --node http://85.214.56.241:26657 -o json | jq -r '.total_count')
+    echo -e "\nBurned amount from chain: ${burned_txs}00000uluna"
 fi
 
 # Propose and Execute add new voter
