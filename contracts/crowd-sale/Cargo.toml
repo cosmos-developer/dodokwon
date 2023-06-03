@@ -20,8 +20,7 @@ cosmwasm-schema = "1.0.4"
 cw2 = "1.0.1"
 cw20 = "1.0.1"
 cw20-base = { version = "1.0.1", features = ["library"] }
-
-terra-bindings = { git = "https://github.com/classic-terra/terra-bindings", branch = "main" }
+classic-bindings = "0.1.1"
 
 [dev-dependencies]
 anyhow = "1.0.71"

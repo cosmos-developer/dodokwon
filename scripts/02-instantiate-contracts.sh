@@ -2,6 +2,7 @@
 
 WALLET=$1
 shift 1
+KEYRING_BACKEND="test"
 
 CHAIN_ID="localterra"
 RPC="http://localhost:26657"
@@ -29,7 +30,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 NODE="--node $RPC"
-TXFLAG="$NODE --chain-id $CHAIN_ID --gas-prices 500000uluna --gas-adjustment 1.3"
+TXFLAG="$NODE --chain-id $CHAIN_ID --gas-prices 1000000000uluna --gas 1000000000 --keyring-backend $KEYRING_BACKEND "
 WALLET_ADDRESS=$(terrad keys list --output json | jq -r "[ .[] | select( .name == \"$WALLET\") ][0].address")
 
 MAX_ATTEMPTS=2

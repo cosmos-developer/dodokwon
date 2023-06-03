@@ -10,7 +10,7 @@ use cosmwasm_std::{
 };
 use cw20::Cw20ExecuteMsg;
 use cw20_base::ContractError as Cw20BaseError;
-use terra_bindings::{TerraQuerier, TerraQuery};
+use classic_bindings::{TerraQuerier, TerraQuery};
 
 const AVG_BLOCKS_PER_DAY: u64 = 24 * 60 * 60 / 5; // 1 block per 5 seconds
 
@@ -175,7 +175,7 @@ mod test {
         testing::{mock_env, mock_info},
         Addr,
     };
-    use terra_bindings::{ExchangeRateItem, ExchangeRatesResponse};
+    use classic_bindings::{ExchangeRateItem, ExchangeRatesResponse};
 
     mod unit_test {
         use super::*;

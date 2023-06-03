@@ -1,7 +1,7 @@
 use cosmwasm_std::{entry_point, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult};
 use error::ContractError;
 use msg::InstantiateMsg;
-use terra_bindings::TerraQuery;
+use classic_bindings::TerraQuery;
 
 pub mod contract;
 pub mod error;
