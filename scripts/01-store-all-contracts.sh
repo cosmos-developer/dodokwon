@@ -37,7 +37,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 NODE="--node $RPC"
-TXFLAG="$NODE --chain-id $CHAIN_ID --gas-prices 2500000uluna --gas auto --gas-adjustment 1.3"
+TXFLAG="$NODE --chain-id $CHAIN_ID --gas-prices 50000uluna --gas auto --gas-adjustment 1.3"
 
 MAX_ATTEMPTS=2
 SLEEP_TIME=5
