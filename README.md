@@ -16,9 +16,16 @@ $ ./01-store-all-contracts.sh <WALLET> \
   --network testnet
 ```
 
-## 2. Instantiate CW20 base
+## 2. Instantiate contracts
 
-- Instantiate CW20 base with both of foundation and minter roles assigned to caller.
+- Having 3 contracts:
+
+  - CW20: DoDoKwan token
+  - Crowd sale: sale token
+  - Foundation: hold initial balance
+
+- Foundation and Crowd Sale contracts need CW20 address to instantiate, so need to instantiate CW20 first.
+- Instantiate CW20 with both of foundation and minter roles assigned to initializer.
 - Once foundation and crowd sale contracts are deployed:
   - Transfer initial balance to foundation contract.
   - Update minter role to crowd sale contract.
@@ -56,4 +63,11 @@ $ ./04-try-query-and-execute.sh <CURRENT_VOTER_WALLET> --network testnet \
 ```sh
 $ ./04-try-query-and-execute.sh <VOTER_WALLET_1> --network testnet \
   --action send --voter <VOTER_WALLET__2>
+```
+
+- Remove existing voter
+
+```sh
+$ ./04-try-query-and-execute.sh <CURRENT_VOTER_WALLET> --network testnet \
+  --action remove-voter --voter <REMOVE_VOTER_WALLET>
 ```

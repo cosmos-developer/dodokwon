@@ -38,7 +38,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 NODE="--node $RPC"
-TXFLAG="$NODE --chain-id $CHAIN_ID --gas-prices 250000000uluna --gas auto --gas-adjustment 1.3"
+TXFLAG="$NODE --chain-id $CHAIN_ID --gas-prices 25000000uluna --gas-adjustment 1.3"
 WALLET_ADDRESS=$(terrad keys list --output json | jq -r "[ .[] | select( .name == \"$WALLET\") ][0].address")
 
 MAX_ATTEMPTS=2
@@ -171,5 +171,56 @@ if [ "$ACTION" = "send" ]; then
     echo -e "\nCw20 balance of $RECIPIENT_ADDRESS: $QUERY_CW20_BALANCE"
 fi
 
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               
+# Propose and Vote and Execute remove voter
+if [ "$ACTION" = "remove-voter" ]; then
+    if [ -z "$VOTER_WALLET" ]; then
+        echo "Expect --voter flag"
+        exit 1
+    fi
+
+    # Propose remove voter
+    echo -e "\n========== Propose remove voter: Propose + Vote + Execute =========="
+    echo -e "\nProposing remove voter..."
+    PROPOSE_REMOVE_VOTER_ARGS="{\"propose\":{\"title\":\"Remove voter title\", \"description\":\"Remove voter description\",\"msgs\":[],\"proposal_type\":{\"remove_voter\":{\"address\":\"$VOTER_ADDRESS\"}}}}"
+    PROPOSE_REMOVE_VOTER=$(terrad tx wasm execute $FOUNDATION_ADDRESS "$PROPOSE_REMOVE_VOTER_ARGS" --from $WALLET $TXFLAG  -y --output json)
+    PROPOSE_REMOVE_VOTER_TX_HASH=$(echo $PROPOSE_REMOVE_VOTER | jq -r .txhash)
+    echo -e "Propose remove voter tx hash: $PROPOSE_REMOVE_VOTER_TX_HASH"
+
+    sleep 5
+
+    # Query proposal list
+    echo -e "\nLatest proposal:" 
+    QUERY_PROPOSAL_LIST_ARGS="{\"reverse_proposals\":{}}"
+    QUERY_PROPOSAL_LIST=$(terrad query wasm contract-state smart $FOUNDATION_ADDRESS $QUERY_PROPOSAL_LIST_ARGS $NODE --output json)
+    PROPOSAL_ID=$(echo $QUERY_PROPOSAL_LIST | jq -r ".data.proposals[0].id")
+    echo $QUERY_PROPOSAL_LIST | jq -r ".data.proposals[0]"
+
+    # Vote remove voter
+    echo -e "\nVoting remove voter..."
+    VOTE_REMOVE_VOTER_ARGS="{\"vote\":{\"proposal_id\":$PROPOSAL_ID, \"vote\":\"yes\"}}"
+    VOTE_REMOVE_VOTER=$(terrad tx wasm execute $FOUNDATION_ADDRESS "$VOTE_REMOVE_VOTER_ARGS" --from $VOTER_WALLET $TXFLAG -y --output json)
+    VOTE_REMOVE_VOTER_TX_HASH=$(echo $VOTE_REMOVE_VOTER | jq -r .txhash)
+    echo -e "Vote remove voter tx hash: $VOTE_REMOVE_VOTER_TX_HASH"
+
+    sleep 5
+
+    # Query proposal status
+    QUERY_PROPOSAL_ARGS="{\"proposal\":{\"proposal_id\":$PROPOSAL_ID}}"
+    QUERY_PROPOSAL=$(terrad query wasm contract-state smart $FOUNDATION_ADDRESS "$QUERY_PROPOSAL_ARGS" $NODE --output json | jq -r ".data")
+
+    # Execute remove voter
+    echo -e "\nExecuting remove voter..."
+    EXECUTE_REMOVE_VOTER_ARGS="{\"execute\":{\"proposal_id\":$PROPOSAL_ID}}"
+    EXECUTE_REMOVE_VOTER=$(terrad tx wasm execute $FOUNDATION_ADDRESS "$EXECUTE_REMOVE_VOTER_ARGS" --from $WALLET $TXFLAG  -y --output json)
+    EXECUTE_REMOVE_VOTER_TX_HASH=$(echo $EXECUTE_REMOVE_VOTER | jq -r .txhash)
+    echo -e "Execute remove voter tx hash: $EXECUTE_REMOVE_VOTER_TX_HASH"
+    
+    sleep 5
+
+    # Query voter list
+    echo -e "\n========== Query voter list =========="
+    QUERY_VOTER_LIST_ARGS="{\"list_voters\":{}}"
+    QUERY_VOTER_LIST=$(terrad query wasm contract-state smart $FOUNDATION_ADDRESS $QUERY_VOTER_LIST_ARGS $NODE --output json)
+    echo $QUERY_VOTER_LIST | jq -r ".data.voters"
+fi                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               
 
