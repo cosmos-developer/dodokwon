@@ -1,12 +1,12 @@
 use crate::{
     error::ContractError,
     msg::*,
-    state::{CW20_ADDRESS, MINTABLE_BLOCK_HEIGHT, UDODOKWAN_UUSD},
+    state::{BURNED_ULUNA, CW20_ADDRESS, MINTABLE_BLOCK_HEIGHT, UDODOKWAN_UUSD},
 };
 
 use cosmwasm_std::{
-    to_binary, Binary, CosmosMsg, Decimal, Deps, DepsMut, Env, MessageInfo, Response, StdResult,
-    Uint128, WasmMsg,
+    to_binary, BankMsg, Binary, Coin, CosmosMsg, Decimal, Deps, DepsMut, Env, MessageInfo,
+    Response, StdResult, Uint128, WasmMsg,
 };
 use cw20::Cw20ExecuteMsg;
 use cw20_base::ContractError as Cw20BaseError;
@@ -27,6 +27,7 @@ pub fn instantiate(
 
     CW20_ADDRESS.save(deps.storage, &msg.cw20_address)?;
     UDODOKWAN_UUSD.save(deps.storage, &msg.udodokwan_per_uusd)?;
+    BURNED_ULUNA.save(deps.storage, &Uint128::zero())?;
 
     Ok(Response::default())
 }
@@ -42,6 +43,8 @@ pub fn execute(
     }
 }
 mod execute {
+    use std::vec;
+
     use super::*;
 
     pub fn mint(
@@ -65,8 +68,8 @@ mod execute {
         let uluna_udodokwan = uluna_uusd.checked_div(udodokwan_uusd).unwrap();
 
         let uluna_amount = cw_utils::must_pay(&info, &base_denom)?;
-        let uluna_amount = Decimal::from_atomics(uluna_amount, 0).unwrap();
-        let udodokwan_amount = uluna_udodokwan.checked_mul(uluna_amount).unwrap();
+        let uluna_amount_decimal = Decimal::from_atomics(uluna_amount, 0).unwrap();
+        let udodokwan_amount = uluna_udodokwan.checked_mul(uluna_amount_decimal).unwrap();
 
         let amount = udodokwan_amount.to_uint_floor();
         if amount == Uint128::zero() {
@@ -87,8 +90,20 @@ mod execute {
         };
         let cw20_mint_cosmos_msg: CosmosMsg = exec_cw20_mint_msg.into();
 
+        let burned_uluna_msg = BankMsg::Burn {
+            amount: vec![Coin {
+                denom: base_denom.to_string(),
+                amount: uluna_amount,
+            }],
+        };
+        BURNED_ULUNA.update(deps.storage, |mut burned_uluna| -> StdResult<_> {
+            burned_uluna += uluna_amount;
+            Ok(burned_uluna)
+        })?;
+
         let res = Response::new()
             .add_message(cw20_mint_cosmos_msg)
+            .add_message(burned_uluna_msg)
             .add_attribute("to", recipient)
             .add_attribute("amount", amount);
         Ok(res)
@@ -103,6 +118,7 @@ pub fn query(deps: Deps<TerraQuery>, _env: Env, msg: QueryMsg) -> StdResult<Bina
         QueryMsg::UdodokwanToUluna { udodokwan_amount } => {
             to_binary(&query::udodokwan_to_uluna(deps, udodokwan_amount)?)
         }
+        QueryMsg::BurnedUluna {} => to_binary(&query::burned_uluna(deps)?),
     }
 }
 
@@ -144,6 +160,11 @@ mod query {
 
         Ok(UdodokwanToUlunaResp { uluna_amount })
     }
+
+    pub fn burned_uluna(deps: Deps<TerraQuery>) -> StdResult<BurnedUlunaResp> {
+        let burned_uluna = BURNED_ULUNA.load(deps.storage)?;
+        Ok(BurnedUlunaResp { burned_uluna })
+    }
 }
 
 #[cfg(test)]
@@ -164,7 +185,7 @@ mod test {
         use cosmwasm_std::{
             from_binary,
             testing::{MockApi, MockQuerier, MockStorage},
-            Coin, OwnedDeps, SystemResult,
+            Coin, OwnedDeps, SystemResult, Uint128,
         };
 
         fn mock_deps_with_terra_query(
@@ -236,7 +257,7 @@ mod test {
         }
 
         #[test]
-        fn can_mint() {
+        fn proper_mint() {
             let mut deps = mock_deps_with_terra_query();
             let env = mock_env();
             let owner = Addr::unchecked("owner");
@@ -250,16 +271,16 @@ mod test {
                 udodokwan_per_uusd,
             };
             let info = mock_info(&owner.to_string(), &[]);
-
-            let res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
-            assert_eq!(0, res.messages.len());
+            instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
 
             let msg = ExecuteMsg::Mint {};
             let buyer = Addr::unchecked("buyer");
             let uluna_amount = 100_000_000;
             let info = mock_info(&buyer.to_string(), &[Coin::new(uluna_amount, "uluna")]);
             let res = execute(deps.as_mut(), env, info, msg).unwrap();
+            println!("{:?}", res);
 
+            // check minted udodokwan amount is correct
             let udodokwan_minted_amount_option =
                 res.attributes.iter().find(|attr| attr.key == "amount");
             assert!(udodokwan_minted_amount_option.is_some());
@@ -273,8 +294,12 @@ mod test {
             );
             let res: UdodokwanToUlunaResp = from_binary(&bin_res.unwrap()).unwrap();
             let uluna_amount_expect = res.uluna_amount.to_uint_ceil();
-
             assert_eq!(uluna_amount, uluna_amount_expect.u128());
+
+            // check burned uluna
+            let bin_res = query(deps.as_ref(), mock_env(), QueryMsg::BurnedUluna {}).unwrap();
+            let burned_uluna_res: BurnedUlunaResp = from_binary(&bin_res).unwrap();
+            assert_eq!(burned_uluna_res.burned_uluna.u128(), uluna_amount);
         }
 
         #[test]

@@ -25,6 +25,9 @@ pub enum QueryMsg {
     UdodokwanPerUusd {},
     #[returns(UdodokwanToUlunaResp)]
     UdodokwanToUluna { udodokwan_amount: Uint128 },
+    // Add query burned uluna
+    #[returns(BurnedUlunaResp)]
+    BurnedUluna {},
 }
 
 #[cw_serde]
@@ -50,4 +53,9 @@ pub struct UdodokwanPerUusdResp {
 #[cw_serde]
 pub struct UdodokwanToUlunaResp {
     pub uluna_amount: Decimal,
+}
+
+#[cw_serde]
+pub struct BurnedUlunaResp {
+    pub burned_uluna: Uint128,
 }
