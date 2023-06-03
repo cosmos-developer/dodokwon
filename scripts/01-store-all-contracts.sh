@@ -2,6 +2,7 @@
 
 WALLET=$1
 shift 1
+KEYRING_BACKEND="test"
 
 CHAIN_ID="localterra"
 RPC="http://localhost:26657"
@@ -37,7 +38,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 NODE="--node $RPC"
-TXFLAG="$NODE --chain-id $CHAIN_ID --gas-prices 2500000uluna --gas auto --gas-adjustment 1.3"
+TXFLAG="$NODE --chain-id $CHAIN_ID --gas-prices 100uluna --gas 1000000000 --keyring-backend $KEYRING_BACKEND "
 
 MAX_ATTEMPTS=2
 SLEEP_TIME=5
@@ -46,7 +47,9 @@ mkdir -p store
 
 if [ -n "$CW20_BASE_PATH" ]; then
     echo -e "\nStoring code cw20-base..."
-    TX=$(terrad tx wasm store $CW20_BASE_PATH --from $WALLET $TXFLAG --output json -y | jq -r '.txhash')
+    TX=$(terrad tx wasm store $CW20_BASE_PATH --from $WALLET $TXFLAG --output json -y)
+    echo $TX
+    TX=$(echo $TX | jq -r '.txhash')
     echo "Store cw20 base contract tx hash: $TX"
 
     attempts=0

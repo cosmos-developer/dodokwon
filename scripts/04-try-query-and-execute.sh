@@ -2,6 +2,7 @@
 
 WALLET=$1
 shift 1
+KEYRING_BACKEND="test"
 
 CHAIN_ID="localterra"
 RPC="http://localhost:26657"
@@ -38,8 +39,8 @@ while [[ $# -gt 0 ]]; do
 done
 
 NODE="--node $RPC"
-TXFLAG="$NODE --chain-id $CHAIN_ID --gas-prices 25000000uluna --gas-adjustment 1.3"
-WALLET_ADDRESS=$(terrad keys list --output json | jq -r "[ .[] | select( .name == \"$WALLET\") ][0].address")
+TXFLAG="$NODE --chain-id $CHAIN_ID --gas-prices 50uluna --gas 1000000 --keyring-backend $KEYRING_BACKEND"
+WALLET_ADDRESS=$(terrad keys list --keyring-backend $KEYRING_BACKEND --output json | jq -r "[ .[] | select( .name == \"$WALLET\") ][0].address")
 
 MAX_ATTEMPTS=2
 SLEEP_TIME=5
@@ -54,13 +55,14 @@ if [ "$ACTION" = "mint" ]; then
         echo -e "Expect --uluna <amount>"
         exit 1
     fi
-    echo -e "\n========== Buyer call mint in crowd sale contract =========="
+    echo -e "\n========== Buyer call mint $ULUNA uluna in crowd sale contract =========="
     QUERY_WALLET_BALANCE_ARGS="{\"balance\":{\"address\":\"$WALLET_ADDRESS\"}}"
     INITIAL_BUYER_BALANCE=$(terrad query wasm contract-state smart $CW20_BASE_ADDRESS $QUERY_WALLET_BALANCE_ARGS $NODE --output json | jq -r .data.balance)
-    echo -e "\nBefore mint Balance of Buyer: $INITIAL_BUYER_BALANCE"
+    echo -e "\nBefore mint Balance of Buyer: $INITIAL_BUYER_BALANCE udodokwon"
 
     MINT_ARGS="{\"mint\":{}}"
     MINT=$(terrad tx wasm execute $CROWD_SALE_ADDRESS $MINT_ARGS --amount "$ULUNA"uluna --from $WALLET $TXFLAG  -y --output json)
+    echo $MINT
     MINT_TX_HASH=$(echo $MINT | jq -r .txhash)
     echo -e "\nMint tx hash: $MINT_TX_HASH"
 
@@ -68,7 +70,7 @@ if [ "$ACTION" = "mint" ]; then
 
     QUERY_WALLET_BALANCE_ARGS="{\"balance\":{\"address\":\"$WALLET_ADDRESS\"}}"
     AFTER_MINT_BUYER_BALANCE=$(terrad query wasm contract-state smart $CW20_BASE_ADDRESS $QUERY_WALLET_BALANCE_ARGS $NODE --output json | jq -r .data.balance)
-    echo -e "\nAfter mint Balance of Buyer: $AFTER_MINT_BUYER_BALANCE"
+    echo -e "\nAfter mint Balance of Buyer: $AFTER_MINT_BUYER_BALANCE udodokwon"
 fi
 
 # Propose and Execute add new voter
