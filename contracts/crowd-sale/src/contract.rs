@@ -4,13 +4,13 @@ use crate::{
     state::{BURNED_ULUNA, CW20_ADDRESS, MINTABLE_BLOCK_HEIGHT, UDODOKWAN_UUSD},
 };
 
+use classic_bindings::{TerraQuerier, TerraQuery};
 use cosmwasm_std::{
     to_binary, BankMsg, Binary, Coin, CosmosMsg, Decimal, Deps, DepsMut, Env, MessageInfo,
     Response, StdResult, Uint128, WasmMsg,
 };
 use cw20::Cw20ExecuteMsg;
 use cw20_base::ContractError as Cw20BaseError;
-use classic_bindings::{TerraQuerier, TerraQuery};
 
 const AVG_BLOCKS_PER_DAY: u64 = 24 * 60 * 60 / 5; // 1 block per 5 seconds
 
@@ -171,11 +171,11 @@ mod query {
 mod test {
     use super::*;
 
+    use classic_bindings::{ExchangeRateItem, ExchangeRatesResponse};
     use cosmwasm_std::{
         testing::{mock_env, mock_info},
         Addr,
     };
-    use classic_bindings::{ExchangeRateItem, ExchangeRatesResponse};
 
     mod unit_test {
         use super::*;
@@ -278,7 +278,6 @@ mod test {
             let uluna_amount = 100_000_000;
             let info = mock_info(&buyer.to_string(), &[Coin::new(uluna_amount, "uluna")]);
             let res = execute(deps.as_mut(), env, info, msg).unwrap();
-            println!("{:?}", res);
 
             // check minted udodokwan amount is correct
             let udodokwan_minted_amount_option =

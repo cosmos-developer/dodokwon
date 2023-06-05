@@ -8,6 +8,8 @@ pub enum ContractError {
     StdError(#[from] StdError),
     #[error("Cw3 fixed multisig error: {0}")]
     Cw3FixedMultisigError(#[from] Cw3FixedMultisigError),
+    #[error("Insufficient fund")]
+    InsufficientFund {},
     #[error("Unauthorized")]
     Unauthorized {},
     #[error("Wrong expiration option")]
