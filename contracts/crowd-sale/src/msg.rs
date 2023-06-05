@@ -4,9 +4,9 @@ use cosmwasm_std::{Addr, Decimal, Uint128};
 #[cw_serde]
 pub struct InstantiateMsg {
     pub cw20_address: Addr,
-    // pub owner: Addr,
     pub mintable_period_days: u64,
     pub udodokwan_per_uusd: Decimal,
+    pub maximum_mintable_per_uusd: Uint128,
 }
 
 #[cw_serde]
@@ -28,6 +28,9 @@ pub enum QueryMsg {
     // Add query burned uluna
     #[returns(BurnedUlunaResp)]
     BurnedUluna {},
+    // Add query maximum mintable amount
+    #[returns(MaximumMintableAmountResp)]
+    MaximumMintableAmount {},
 }
 
 #[cw_serde]
@@ -58,4 +61,9 @@ pub struct UdodokwanToUlunaResp {
 #[cw_serde]
 pub struct BurnedUlunaResp {
     pub burned_uluna: Uint128,
+}
+
+#[cw_serde]
+pub struct MaximumMintableAmountResp {
+    pub maximum_mintable_amount: Uint128,
 }

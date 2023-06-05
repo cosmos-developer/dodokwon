@@ -1,4 +1,4 @@
-use cosmwasm_std::{StdError, SystemError};
+use cosmwasm_std::StdError;
 use cw20_base::ContractError as Cw20BaseError;
 use cw_utils::PaymentError;
 use thiserror::Error;
@@ -13,6 +13,6 @@ pub enum ContractError {
     Payment(#[from] PaymentError),
     #[error("Exceed mintable block height")]
     ExceedMintableBlock {},
-    #[error("System error: {0}")]
-    SystemError(#[from] SystemError),
+    #[error("Exceed maximum mintable amount")]
+    ExceedMaximumMintableAmount {},
 }
