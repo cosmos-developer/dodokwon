@@ -10,6 +10,8 @@ pub enum ContractError {
     Cw3FixedMultisigError(#[from] Cw3FixedMultisigError),
     #[error("Insufficient fund")]
     InsufficientFund {},
+    #[error("Voter does not exist")]
+    VoterNotExist {},
     #[error("Unauthorized")]
     Unauthorized {},
     #[error("Wrong expiration option")]

@@ -162,9 +162,15 @@ mod execute {
                 .add_attribute("type", "add_voter")
                 .add_attribute("voter", address)
                 .add_attribute("vote_weight", vote_weight.to_string())),
-            ProposalType::RemoveVoter { address } => Ok(res
-                .add_attribute("type", "remove_voter")
-                .add_attribute("voter", address)),
+            ProposalType::RemoveVoter { address } => {
+                let voter = VOTERS.load(deps.storage, &address);
+                if voter.is_err() {
+                    return Err(ContractError::VoterNotExist {});
+                }
+                Ok(res
+                    .add_attribute("type", "remove_voter")
+                    .add_attribute("voter", address))
+            }
         }
     }
 
