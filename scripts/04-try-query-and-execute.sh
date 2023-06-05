@@ -39,7 +39,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 NODE="--node $RPC"
-TXFLAG="$NODE --chain-id $CHAIN_ID --gas-prices 50uluna --gas 1000000 --keyring-backend $KEYRING_BACKEND"
+TXFLAG="$NODE --chain-id $CHAIN_ID --gas auto --gas-adjustment 1.2 --keyring-backend $KEYRING_BACKEND"
 WALLET_ADDRESS=$(terrad keys list --keyring-backend $KEYRING_BACKEND --output json | jq -r "[ .[] | select( .name == \"$WALLET\") ][0].address")
 
 MAX_ATTEMPTS=2
@@ -56,7 +56,7 @@ if [ "$ACTION" = "mint" ]; then
         exit 1
     fi
     
-    burned_txs=$(terrad q txs --events 'burn.burner=terra1xds4f0m87ajl3a6az6s2enhxrd0wta48kzx23l&burn.amount=10000uluna' --node http://85.214.56.241:26657 -o json | jq -r '.total_count')
+    burned_txs=$(terrad q txs --events 'burn.burner=terra1xds4f0m87ajl3a6az6s2enhxrd0wta48kzx23l&burn.amount=10000uluna' $NODE -o json | jq -r '.total_count')
     echo -e "\nBurned amount from chain: ${burned_txs}00000uluna"
 
     echo -e "\n========== Buyer call mint $ULUNA uluna in crowd sale contract =========="
@@ -84,7 +84,7 @@ if [ "$ACTION" = "mint" ]; then
     QUERY_BURNED_LUNA=$(terrad query wasm contract-state smart $CROWD_SALE_ADDRESS $QUERY_BURNED_LUNA_ARGS $NODE --output json | jq -r .data.burned_uluna)
     echo -e "\nquery burned luna from smart contract: ${QUERY_BURNED_LUNA}uluna"
 
-    burned_txs=$(terrad q txs --events 'burn.burner=terra1xds4f0m87ajl3a6az6s2enhxrd0wta48kzx23l&burn.amount=10000uluna' --node http://85.214.56.241:26657 -o json | jq -r '.total_count')
+    burned_txs=$(terrad q txs --events 'burn.burner=terra1xds4f0m87ajl3a6az6s2enhxrd0wta48kzx23l&burn.amount=10000uluna' $NODE -o json | jq -r '.total_count')
     echo -e "\nBurned amount from chain: ${burned_txs}00000uluna"
 fi
 

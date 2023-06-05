@@ -26,8 +26,8 @@ while [[ $# -gt 0 ]]; do
 done
 
 NODE="--node $RPC"
-TXFLAG="$NODE --chain-id $CHAIN_ID --gas auto --gas-adjustment 5 --keyring-backend $KEYRING_BACKEND "
-WALLET_ADDRESS=$(terrad keys list --output json | jq -r "[ .[] | select( .name == \"$WALLET\") ][0].address")
+TXFLAG="$NODE --chain-id $CHAIN_ID --gas auto --gas-adjustment 1.2 --keyring-backend $KEYRING_BACKEND"
+WALLET_ADDRESS=$(terrad keys list --output json --keyring-backend $KEYRING_BACKEND | jq -r "[ .[] | select( .name == \"$WALLET\") ][0].address")
 
 MAX_ATTEMPTS=2
 SLEEP_TIME=5

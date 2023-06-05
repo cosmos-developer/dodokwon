@@ -48,7 +48,7 @@ $ ./03-transfer-and-update-minter.sh <WALLET> --network testnet
 
 ```sh
 $ ./04-try-query-and-execute.sh <BUYER-WALLET> --network testnet \
-  -action mint --uluna <AMOUNT>
+  --action mint --uluna <AMOUNT>
 ```
 
 - Add new voter
