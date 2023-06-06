@@ -158,10 +158,16 @@ mod execute {
             ProposalType::AddVoter {
                 address,
                 vote_weight,
-            } => Ok(res
-                .add_attribute("type", "add_voter")
-                .add_attribute("voter", address)
-                .add_attribute("vote_weight", vote_weight.to_string())),
+            } => {
+                if vote_weight == 0 {
+                    return Err(ContractError::InvalidVoteWeight {});
+                }
+
+                Ok(res
+                    .add_attribute("type", "add_voter")
+                    .add_attribute("voter", address)
+                    .add_attribute("vote_weight", vote_weight.to_string()))
+            }
             ProposalType::RemoveVoter { address } => {
                 let voter = VOTERS.load(deps.storage, &address);
                 if voter.is_err() {
@@ -803,6 +809,46 @@ mod test {
         let bin_res = query(deps.as_ref(), env.clone(), query_voter_msg).unwrap();
         let res: VoterResponse = from_binary(&bin_res).unwrap();
         assert_eq!(res, VoterResponse { weight: Some(1) });
+    }
+
+    #[test]
+    fn error_add_voter_with_vote_weight_zero() {
+        let mut deps = mock_dependencies();
+        let env = mock_env();
+        let info = mock_info("sender", &[]);
+
+        let max_voting_period = 10;
+        let threshold_percentage = 100;
+        let voters = vec![Voter {
+            addr: "voter1".into(),
+            weight: 1,
+        }];
+        let msg = InstantiateMsg {
+            cw20_address: Addr::unchecked("cw20_address"),
+            max_voting_period: Duration::Height(max_voting_period),
+            voters: voters.clone(),
+            threshold: Threshold::AbsolutePercentage {
+                percentage: Decimal::percent(threshold_percentage),
+            },
+        };
+        instantiate(deps.as_mut(), env.clone(), info, msg).unwrap();
+
+        let new_voter = "new_voter";
+        let proposal_type = msg::ProposalType::AddVoter {
+            address: Addr::unchecked(new_voter),
+            vote_weight: 0,
+        };
+        let propose_msg = ExecuteMsg::Propose {
+            title: "title".to_string(),
+            description: "description".to_string(),
+            proposal_type: proposal_type.clone(),
+            msgs: vec![],
+            latest: None,
+        };
+        let voter1_info = mock_info(&voters[0].addr, &[]);
+        let res = execute(deps.as_mut(), env.clone(), voter1_info, propose_msg.clone());
+        assert!(res.is_err());
+        assert_eq!(res.unwrap_err(), ContractError::InvalidVoteWeight {});
     }
 
     #[test]
