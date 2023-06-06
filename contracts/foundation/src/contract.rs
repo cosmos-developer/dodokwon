@@ -168,9 +168,9 @@ mod execute {
                     return Err(ContractError::VoterNotExist {});
                 }
 
-                let voter_threshold = voter.unwrap();
+                let voter_weight = voter.unwrap();
                 let config = CONFIG.load(deps.storage)?;
-                if config.total_weight == voter_threshold {
+                if config.total_weight == voter_weight {
                     return Err(ContractError::LastVoter {});
                 }
 
