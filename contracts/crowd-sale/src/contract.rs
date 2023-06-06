@@ -105,7 +105,8 @@ mod execute {
             .add_message(cw20_mint_cosmos_msg)
             .add_message(burned_uluna_msg)
             .add_attribute("to", recipient)
-            .add_attribute("amount", amount);
+            .add_attribute("amount", amount)
+            .add_attribute("uluna_burned", uluna_amount);
         Ok(res)
     }
 }
