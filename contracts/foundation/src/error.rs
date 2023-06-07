@@ -10,6 +10,10 @@ pub enum ContractError {
     Cw3FixedMultisigError(#[from] Cw3FixedMultisigError),
     #[error("Insufficient fund")]
     InsufficientFund {},
+    #[error("Vote weight must be greater than zero")]
+    InvalidVoteWeight {},
+    #[error("Must have at least one voter")]
+    LastVoter,
     #[error("Voter does not exist")]
     VoterNotExist {},
     #[error("Unauthorized")]

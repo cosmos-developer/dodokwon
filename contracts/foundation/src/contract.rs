@@ -158,15 +158,28 @@ mod execute {
             ProposalType::AddVoter {
                 address,
                 vote_weight,
-            } => Ok(res
-                .add_attribute("type", "add_voter")
-                .add_attribute("voter", address)
-                .add_attribute("vote_weight", vote_weight.to_string())),
+            } => {
+                if vote_weight == 0 {
+                    return Err(ContractError::InvalidVoteWeight {});
+                }
+
+                Ok(res
+                    .add_attribute("type", "add_voter")
+                    .add_attribute("voter", address)
+                    .add_attribute("vote_weight", vote_weight.to_string()))
+            }
             ProposalType::RemoveVoter { address } => {
                 let voter = VOTERS.load(deps.storage, &address);
                 if voter.is_err() {
                     return Err(ContractError::VoterNotExist {});
                 }
+
+                let voter_weight = voter.unwrap();
+                let config = CONFIG.load(deps.storage)?;
+                if config.total_weight == voter_weight {
+                    return Err(ContractError::LastVoter {});
+                }
+
                 Ok(res
                     .add_attribute("type", "remove_voter")
                     .add_attribute("voter", address))
@@ -799,6 +812,46 @@ mod test {
     }
 
     #[test]
+    fn error_add_voter_with_vote_weight_zero() {
+        let mut deps = mock_dependencies();
+        let env = mock_env();
+        let info = mock_info("sender", &[]);
+
+        let max_voting_period = 10;
+        let threshold_percentage = 100;
+        let voters = vec![Voter {
+            addr: "voter1".into(),
+            weight: 1,
+        }];
+        let msg = InstantiateMsg {
+            cw20_address: Addr::unchecked("cw20_address"),
+            max_voting_period: Duration::Height(max_voting_period),
+            voters: voters.clone(),
+            threshold: Threshold::AbsolutePercentage {
+                percentage: Decimal::percent(threshold_percentage),
+            },
+        };
+        instantiate(deps.as_mut(), env.clone(), info, msg).unwrap();
+
+        let new_voter = "new_voter";
+        let proposal_type = msg::ProposalType::AddVoter {
+            address: Addr::unchecked(new_voter),
+            vote_weight: 0,
+        };
+        let propose_msg = ExecuteMsg::Propose {
+            title: "title".to_string(),
+            description: "description".to_string(),
+            proposal_type: proposal_type.clone(),
+            msgs: vec![],
+            latest: None,
+        };
+        let voter1_info = mock_info(&voters[0].addr, &[]);
+        let res = execute(deps.as_mut(), env.clone(), voter1_info, propose_msg.clone());
+        assert!(res.is_err());
+        assert_eq!(res.unwrap_err(), ContractError::InvalidVoteWeight {});
+    }
+
+    #[test]
     fn remove_voter_after_proposal_passed() {
         let mut deps = mock_dependencies();
         let env = mock_env();
@@ -881,6 +934,46 @@ mod test {
                 total_weight: total_weight - remove_voter.weight,
             }
         );
+    }
+
+    #[test]
+    fn error_remove_last_voter() {
+        let mut deps = mock_dependencies();
+        let env = mock_env();
+        let info = mock_info("sender", &[]);
+
+        let max_voting_period = 10;
+        let threshold_percentage = 50;
+        let voters = vec![Voter {
+            addr: "voter1".into(),
+            weight: 1,
+        }];
+        // let total_weight = voters.iter().map(|v| v.weight).sum::<u64>();
+        let msg = InstantiateMsg {
+            cw20_address: Addr::unchecked("cw20_address"),
+            max_voting_period: Duration::Height(max_voting_period),
+            voters: voters.clone(),
+            threshold: Threshold::AbsolutePercentage {
+                percentage: Decimal::percent(threshold_percentage),
+            },
+        };
+        instantiate(deps.as_mut(), env.clone(), info, msg).unwrap();
+
+        let remove_voter = voters[0].clone();
+        let proposal_type = msg::ProposalType::RemoveVoter {
+            address: Addr::unchecked(&remove_voter.addr),
+        };
+        let propose_msg = ExecuteMsg::Propose {
+            title: "title".to_string(),
+            description: "description".to_string(),
+            proposal_type: proposal_type.clone(),
+            msgs: vec![],
+            latest: None,
+        };
+        let voter1_info = mock_info(&voters[0].addr, &[]);
+        let res = execute(deps.as_mut(), env.clone(), voter1_info, propose_msg);
+        assert!(res.is_err());
+        assert_eq!(res.unwrap_err(), ContractError::LastVoter {});
     }
 
     // #[test]
