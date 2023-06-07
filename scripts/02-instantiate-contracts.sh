@@ -76,7 +76,7 @@ if [ -z "$ONLY_CONTRACT" ] || [ "$ONLY_CONTRACT" = "crowd-sale" ]; then
     CROWD_SALE_CODE_ID=$(cat ./store/crowd-sale-store-data.json | jq -r .code_id)
 
     echo -e "\n\nInstantiating crowd sale contract..."
-    INITIAL_STATE="{\"cw20_address\" : \"$CW20_BASE_ADDRESS\", \"mintable_period_days\": 30, \"udodokwan_per_uusd\": \"0.000000001\"}"
+    INITIAL_STATE="{\"cw20_address\" : \"$CW20_BASE_ADDRESS\", \"mintable_period_days\": 30, \"udodokwan_per_uusd\": \"0.000000001\", \"maximum_mintable_per_uusd\": \"1000000000\"}"
     INSTANTIATE_TX=$(terrad tx wasm instantiate $CROWD_SALE_CODE_ID "$INITIAL_STATE" --label "crowd-sale" --from $WALLET $TXFLAG -y --no-admin --output json | jq -r .txhash)
 
     attempts=0

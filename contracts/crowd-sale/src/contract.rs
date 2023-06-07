@@ -1,7 +1,9 @@
 use crate::{
     error::ContractError,
     msg::*,
-    state::{BURNED_ULUNA, CW20_ADDRESS, MINTABLE_BLOCK_HEIGHT, UDODOKWAN_UUSD},
+    state::{
+        BURNED_ULUNA, CW20_ADDRESS, MAXIMUM_MINTABLE_AMOUNT, MINTABLE_BLOCK_HEIGHT, UDODOKWAN_UUSD,
+    },
 };
 
 use classic_bindings::{TerraQuerier, TerraQuery};
@@ -9,7 +11,7 @@ use cosmwasm_std::{
     to_binary, BankMsg, Binary, Coin, CosmosMsg, Decimal, Deps, DepsMut, Env, MessageInfo,
     Response, StdResult, Uint128, WasmMsg,
 };
-use cw20::Cw20ExecuteMsg;
+use cw20::{BalanceResponse as Cw20BalanceResponse, Cw20ExecuteMsg};
 use cw20_base::ContractError as Cw20BaseError;
 
 const AVG_BLOCKS_PER_DAY: u64 = 24 * 60 * 60 / 5; // 1 block per 5 seconds
@@ -28,6 +30,12 @@ pub fn instantiate(
     CW20_ADDRESS.save(deps.storage, &msg.cw20_address)?;
     UDODOKWAN_UUSD.save(deps.storage, &msg.udodokwan_per_uusd)?;
     BURNED_ULUNA.save(deps.storage, &Uint128::zero())?;
+
+    let maximum_mintable_amount = Decimal::from_atomics(msg.maximum_mintable_per_uusd, 0)
+        .unwrap()
+        .checked_div(msg.udodokwan_per_uusd)
+        .unwrap();
+    MAXIMUM_MINTABLE_AMOUNT.save(deps.storage, &maximum_mintable_amount.to_uint_ceil())?;
 
     Ok(Response::default())
 }
@@ -69,19 +77,36 @@ mod execute {
 
         let uluna_amount = cw_utils::must_pay(&info, &base_denom)?;
         let uluna_amount_decimal = Decimal::from_atomics(uluna_amount, 0).unwrap();
-        let udodokwan_amount = uluna_udodokwan.checked_mul(uluna_amount_decimal).unwrap();
 
-        let amount = udodokwan_amount.to_uint_floor();
-        if amount == Uint128::zero() {
+        let udodokwan_amount = uluna_udodokwan.checked_mul(uluna_amount_decimal).unwrap();
+        let udodokwan_amount = udodokwan_amount.to_uint_floor();
+        if udodokwan_amount.is_zero() {
             return Err((Cw20BaseError::InvalidZeroAmount {}).into());
         }
 
         let cw20_address = CW20_ADDRESS.load(deps.storage)?;
         let recipient = info.sender;
 
+        let query_balance_msg = cw20::Cw20QueryMsg::Balance {
+            address: recipient.to_string(),
+        };
+        let recipient_balance: Cw20BalanceResponse = deps
+            .querier
+            .query_wasm_smart(cw20_address.clone(), &query_balance_msg)
+            .unwrap();
+        let owned_udodokwan_amount = recipient_balance.balance;
+        let total_udodokwan_amount = owned_udodokwan_amount
+            .checked_add(udodokwan_amount)
+            .unwrap();
+
+        let maximum_mintable_amount = MAXIMUM_MINTABLE_AMOUNT.load(deps.storage).unwrap();
+        if total_udodokwan_amount > maximum_mintable_amount {
+            return Err(ContractError::ExceedMaximumMintableAmount {});
+        }
+
         let mint_cw20_msg = Cw20ExecuteMsg::Mint {
             recipient: recipient.to_string(),
-            amount,
+            amount: udodokwan_amount,
         };
         let exec_cw20_mint_msg = WasmMsg::Execute {
             contract_addr: cw20_address.into(),
@@ -120,6 +145,7 @@ pub fn query(deps: Deps<TerraQuery>, _env: Env, msg: QueryMsg) -> StdResult<Bina
             to_binary(&query::udodokwan_to_uluna(deps, udodokwan_amount)?)
         }
         QueryMsg::BurnedUluna {} => to_binary(&query::burned_uluna(deps)?),
+        QueryMsg::MaximumMintableAmount {} => to_binary(&query::maximum_mintable_amount(deps)?),
     }
 }
 
@@ -166,6 +192,13 @@ mod query {
         let burned_uluna = BURNED_ULUNA.load(deps.storage)?;
         Ok(BurnedUlunaResp { burned_uluna })
     }
+
+    pub fn maximum_mintable_amount(deps: Deps<TerraQuery>) -> StdResult<MaximumMintableAmountResp> {
+        let maximum_mintable_amount = MAXIMUM_MINTABLE_AMOUNT.load(deps.storage)?;
+        Ok(MaximumMintableAmountResp {
+            maximum_mintable_amount,
+        })
+    }
 }
 
 #[cfg(test)]
@@ -186,8 +219,9 @@ mod test {
         use cosmwasm_std::{
             from_binary,
             testing::{MockApi, MockQuerier, MockStorage},
-            Coin, OwnedDeps, SystemResult, Uint128,
+            Coin, OwnedDeps, SystemResult, Uint128, WasmQuery,
         };
+        use cw20::Cw20QueryMsg;
 
         fn mock_deps_with_terra_query(
         ) -> OwnedDeps<MockStorage, MockApi, MockQuerier<TerraQuery>, TerraQuery> {
@@ -206,10 +240,7 @@ mod test {
                             base_denom: base_denom.to_string(),
                             exchange_rates: vec![ExchangeRateItem {
                                 quote_denom: quote_denoms[0].to_string(),
-                                exchange_rate: Decimal::from_ratio(
-                                    Uint128::from(1u128),
-                                    Uint128::from(11_500u128),
-                                ),
+                                exchange_rate: Decimal::from_str("0.00009").unwrap(),
                             }],
                         };
                         let bin_response = to_binary(&response);
@@ -235,6 +266,7 @@ mod test {
                 cw20_address: cw20_address.clone(),
                 mintable_period_days: 30,
                 udodokwan_per_uusd,
+                maximum_mintable_per_uusd: Uint128::from(1000u128),
             };
 
             let res = instantiate(deps.as_mut(), env.clone(), info, msg.clone()).unwrap();
@@ -270,13 +302,29 @@ mod test {
                 cw20_address: cw20_address.clone(),
                 mintable_period_days: 30,
                 udodokwan_per_uusd,
+                maximum_mintable_per_uusd: Uint128::from(1_000_000_000u128),
             };
             let info = mock_info(&owner.to_string(), &[]);
             instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
 
             let msg = ExecuteMsg::Mint {};
             let buyer = Addr::unchecked("buyer");
-            let uluna_amount = 100_000_000;
+            let uluna_amount = 1_000_000_000_000;
+
+            deps.querier.update_wasm(|query| match query {
+                WasmQuery::Smart { contract_addr, msg } => match from_binary(&msg).unwrap() {
+                    Cw20QueryMsg::Balance { address } => {
+                        assert_eq!(contract_addr, "cw20_address");
+                        assert_eq!(address, "buyer");
+                        let res = Cw20BalanceResponse {
+                            balance: Uint128::from(0u128),
+                        };
+                        SystemResult::Ok((to_binary(&res)).into())
+                    }
+                    _ => panic!("DO NOT ENTER HERE"),
+                },
+                _ => panic!("DO NOT ENTER HERE"),
+            });
             let info = mock_info(&buyer.to_string(), &[Coin::new(uluna_amount, "uluna")]);
             let res = execute(deps.as_mut(), env, info, msg).unwrap();
 
@@ -315,13 +363,14 @@ mod test {
                 cw20_address: cw20_address.clone(),
                 mintable_period_days: 30,
                 udodokwan_per_uusd,
+                maximum_mintable_per_uusd: Uint128::from(1000u128),
             };
             let info = mock_info(&owner.to_string(), &[]);
             instantiate(deps.as_mut(), env.clone(), info, msg).unwrap();
 
             let msg = ExecuteMsg::Mint {};
             let buyer = Addr::unchecked("buyer");
-            let uluna_amount = 100_000_000;
+            let uluna_amount = 1_000_000;
             let info = mock_info(&buyer.to_string(), &[Coin::new(uluna_amount, "uluna")]);
             env.block.height += 30 * AVG_BLOCKS_PER_DAY + 1;
             let res = execute(deps.as_mut(), env, info, msg);
