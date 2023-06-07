@@ -30,8 +30,8 @@ while [[ $# -gt 0 ]]; do
 done
 
 NODE="--node $RPC"
-TXFLAG="$NODE --chain-id $CHAIN_ID --gas-prices 1000000000uluna --gas 1000000000 --keyring-backend $KEYRING_BACKEND "
-WALLET_ADDRESS=$(terrad keys list --output json | jq -r "[ .[] | select( .name == \"$WALLET\") ][0].address")
+TXFLAG="$NODE --chain-id $CHAIN_ID --gas auto --gas-adjustment 1.2 --gas-prices 1uluna --keyring-backend $KEYRING_BACKEND"
+WALLET_ADDRESS=$(terrad keys list --output json --keyring-backend $KEYRING_BACKEND | jq -r "[ .[] | select( .name == \"$WALLET\") ][0].address")
 
 MAX_ATTEMPTS=2
 SLEEP_TIME=5
@@ -43,7 +43,9 @@ if [ -z "$ONLY_CONTRACT" ] || [ "$ONLY_CONTRACT" = "cw20-base" ]; then
 
     echo -e "\n\nInstantiating cw20 base contract..."
     INITIAL_STATE="{\"name\" : \"DoDoKwan\", \"symbol\": \"DDK\", \"decimals\": 6, \"initial_balances\": [{\"address\": \"$WALLET_ADDRESS\", \"amount\": \"32523579000000\"}], \"mint\": {\"minter\": \"$WALLET_ADDRESS\", \"cap\": \"413786000000000\"}}"
-    INSTANTIATE_TX=$(terrad tx wasm instantiate $CW20_CODE_ID "$INITIAL_STATE" --label "cw20-base" --from $WALLET $TXFLAG -y --no-admin --output json | jq -r .txhash)
+    INSTANTIATE_TX=$(terrad tx wasm instantiate $CW20_CODE_ID "$INITIAL_STATE" --label "cw20-base" --from $WALLET $TXFLAG -y --no-admin --output json)
+    echo $INSTANTIATE_TX
+    INSTANTIATE_TX=$(echo $INSTANTIATE_TX | jq -r .txhash)
     
     attempts=0
     success=false

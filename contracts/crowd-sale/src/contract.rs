@@ -105,7 +105,8 @@ mod execute {
             .add_message(cw20_mint_cosmos_msg)
             .add_message(burned_uluna_msg)
             .add_attribute("to", recipient)
-            .add_attribute("amount", amount);
+            .add_attribute("amount", amount)
+            .add_attribute("uluna_burned", uluna_amount);
         Ok(res)
     }
 }
@@ -228,7 +229,7 @@ mod test {
             let owner = Addr::unchecked("owner");
             let info = mock_info(&owner.to_string(), &[]);
 
-            let udodokwan_per_uusd = Decimal::from_str("0.0000000001").unwrap();
+            let udodokwan_per_uusd = Decimal::from_str("0.000000001").unwrap();
             let cw20_address = Addr::unchecked("cw20_address");
             let msg = InstantiateMsg {
                 cw20_address: cw20_address.clone(),
@@ -262,7 +263,7 @@ mod test {
             let env = mock_env();
             let owner = Addr::unchecked("owner");
 
-            let udodokwan_per_uusd = Decimal::from_str("0.0000000001").unwrap();
+            let udodokwan_per_uusd = Decimal::from_str("0.000000001").unwrap();
 
             let cw20_address = Addr::unchecked("cw20_address");
             let msg = InstantiateMsg {
@@ -307,7 +308,7 @@ mod test {
             let mut env = mock_env();
             let owner = Addr::unchecked("owner");
 
-            let udodokwan_per_uusd = Decimal::from_str("0.0000000001").unwrap();
+            let udodokwan_per_uusd = Decimal::from_str("0.000000001").unwrap();
 
             let cw20_address = Addr::unchecked("cw20_address");
             let msg = InstantiateMsg {
